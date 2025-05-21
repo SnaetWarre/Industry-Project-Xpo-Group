@@ -1,8 +1,3 @@
-import twisted.internet.reactor as _reactor
-# Patch missing _handleSignals on EPollReactor
-if not hasattr(_reactor, '_handleSignals'):
-    _reactor._handleSignals = lambda *args, **kwargs: None
-
 BOT_NAME = "kortrijk_xpo"
 
 SPIDER_MODULES = ["kortrijk_xpo.spiders"]
@@ -40,5 +35,11 @@ DUPEFILTER_DEBUG = True
 
 # Set settings whose default value is deprecated to a future-proof value
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
-ASYNCIO_EVENT_LOOP = ''
-FEED_EXPORT_ENCODING = "utf-8" 
+FEED_EXPORT_ENCODING = "utf-8"
+
+# Explicitly set the Twisted reactor and asyncio event loop
+# This can help resolve "Error loading object '': not a full path" issues.
+TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+# For Linux/macOS. For Windows, you might need "asyncio.ProactorEventLoop",
+# but SelectorEventLoop is generally more compatible.
+ASYNCIO_EVENT_LOOP = "asyncio.SelectorEventLoop" 

@@ -5,27 +5,32 @@ from langchain.prompts import PromptTemplate
 import json
 import re # For more advanced keyword searching
 from typing import List, Dict, Optional
+import argparse, os
 
 class EventChatbot:
-    def __init__(self):
+    def __init__(self, data_path: str = "full_site_data.json"):
         # Initialize Ollama with DeepSeek model
+        self.data_path = data_path # Store the path for later logic
         self.llm = Ollama(model="llama3")
         
         # Load events
         self.events: List[Dict] = []
         try:
-            with open('full_site_data.json', 'r', encoding='utf-8') as f:
+            with open(data_path, 'r', encoding='utf-8') as f:
                 self.events = json.load(f)
             if not self.events:
-                 print("Warning: 'full_site_data.json' was loaded but is empty or not valid JSON list.")
+                 print(f"Warning: '{data_path}' was loaded but is empty or not valid JSON list.")
                  self.events = []
         except FileNotFoundError:
-            print("Error: 'full_site_data.json' not found. Chatbot will not have event data.")
+            print(f"Error: '{data_path}' not found. Chatbot will not have event data.")
         except json.JSONDecodeError as e:
-            print(f"Error decoding JSON from 'full_site_data.json': {e}. Chatbot will not have event data.")
+            print(f"Error decoding JSON from '{data_path}': {e}. Chatbot will not have event data.")
         except Exception as e:
-            print(f"An unexpected error occurred loading 'full_site_data.json': {e}")
+            print(f"An unexpected error occurred loading '{data_path}': {e}")
         
+        # Enrich events with stand numbers parsed from raw_text_content (if any)
+        self._add_stand_numbers_to_events()
+
         # Create conversation memory
         self.memory = ConversationBufferMemory()
         
@@ -81,7 +86,8 @@ class EventChatbot:
                       "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", 
                       "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", 
                       "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now", "tell", "me", "about",
-                      "like", "events", "event", "find", "show", "what's", "whats", "looking", "interested"}
+                      "like", "events", "event", "find", "show", "what's", "whats", "looking", "interested",
+                      "hey", "hi", "hello", "there"}
 
         keywords = [word for word in words if word not in stop_words and len(word) > 2] # Basic filtering
         
@@ -94,7 +100,7 @@ class EventChatbot:
         print(f"[DEBUG _extract_keywords_from_input] Extracted: {keywords} from '{user_input}'")
         return list(set(keywords)) # Return unique keywords
 
-    def _get_contextual_snippet(self, text: str, keyword: str, window_size: int = 150) -> Optional[str]:
+    def _get_contextual_snippet(self, text: str, keyword: str, window_size: int = 1000) -> Optional[str]:
         """Extracts a snippet of text around the first occurrence of a keyword."""
         try:
             text_lower = text.lower()
@@ -122,7 +128,13 @@ class EventChatbot:
         if not self.events:
             print("[DEBUG get_relevant_events] No events loaded to search from.")
             return []
-        if not extracted_keywords:
+
+        # If no keywords and we are using a specific event file (not the full dump)
+        # then assume all content in that file is relevant for a generic query.
+        if not extracted_keywords and self.data_path != "full_site_data.json":
+            print(f"[DEBUG get_relevant_events] No specific keywords, using all {len(self.events)} items from {self.data_path} as context.")
+            return self.events # Return all loaded events for the specific event file
+        elif not extracted_keywords:
             print("[DEBUG get_relevant_events] No keywords extracted, cannot find relevant events effectively.")
             # Optionally, return a few generic events or an empty list
             return self.events[:3] # Return first 3 as a sample if no keywords found
@@ -173,12 +185,18 @@ class EventChatbot:
                 processed_event['_matching_details'] = matching_details
                 
                 # If there was a match in raw_text, try to generate a relevant snippet
-                # For simplicity, use the first matched keyword in raw_text for the snippet
                 if matched_raw_text_keywords:
-                    snippet_keyword = matched_raw_text_keywords[0]
-                    snippet = self._get_contextual_snippet(event_text_for_snippet, snippet_keyword)
-                    if snippet:
-                        processed_event['relevant_snippet'] = snippet
+                    all_snippets_for_event = set() # Use a set to store unique snippets
+                    for snippet_keyword in matched_raw_text_keywords:
+                        # _get_contextual_snippet is called for each keyword found in raw_text.
+                        # It will find the first occurrence of *that specific* snippet_keyword.
+                        snippet = self._get_contextual_snippet(event_text_for_snippet, snippet_keyword)
+                        if snippet:
+                            all_snippets_for_event.add(snippet)
+                    
+                    if all_snippets_for_event:
+                        # Join unique snippets, sorted for some deterministic order.
+                        processed_event['relevant_snippet'] = " ...\n\n... ".join(sorted(list(all_snippets_for_event)))
                 
                 scored_events.append(processed_event)
 
@@ -216,9 +234,11 @@ class EventChatbot:
                 social_links_list = event.get('socialmedia_links', [])
                 social_links = ', '.join(social_links_list) if social_links_list else 'N/A'
                 source_type = event.get('source_type', 'unknown')
+                stand_numbers_list = event.get('stand_numbers', [])
+                stand_numbers = ', '.join(stand_numbers_list) if stand_numbers_list else 'N/A'
                 snippet = event.get('relevant_snippet', '') # Get pre-generated snippet
 
-                event_detail = f"Event Title: {title}\nURL: {url}\nDescription: {description}\nSocial Links: {social_links}\nSource Type: {source_type}"
+                event_detail = f"Event Title: {title}\nURL: {url}\nDescription: {description}\nStand Number(s): {stand_numbers}\nSocial Links: {social_links}\nSource Type: {source_type}"
                 if snippet:
                     event_detail += f"\nRelevant Snippet from Content: {snippet}"
                 
@@ -251,10 +271,50 @@ User's Question: {user_input}"""
 
         return response
 
+    # ------------------------------------------------------------------
+    # Helper: Extract stand numbers
+    # ------------------------------------------------------------------
+    def _parse_stand_numbers(self, text: str) -> List[str]:
+        """Return a list of stand numbers (e.g. '142', 'A01') found in the text."""
+        pattern = re.compile(r"\bstand\s*[:\-]?\s*([A-Za-z0-9]{1,5})\b", re.IGNORECASE)
+        raw_matches = pattern.findall(text)
+
+        # Keep only items that contain at least one digit (to drop words like 'enbouwer')
+        cleaned = [m for m in raw_matches if any(ch.isdigit() for ch in m)]
+        return cleaned
+
+    def _add_stand_numbers_to_events(self):
+        """Iterate over loaded events and add a 'stand_numbers' field if we can parse it."""
+        for evt in self.events:
+            if 'stand_numbers' in evt:
+                continue  # already processed
+
+            raw_text = evt.get('raw_text_content', '')
+            if not raw_text:
+                continue
+
+            stands = self._parse_stand_numbers(raw_text)
+            if stands:
+                # Deduplicate while preserving order
+                seen = set()
+                unique_stands = []
+                for s in stands:
+                    if s not in seen:
+                        unique_stands.append(s)
+                        seen.add(s)
+                evt['stand_numbers'] = unique_stands
+
 if __name__ == "__main__":
-    chatbot = EventChatbot()
+    parser = argparse.ArgumentParser(description="Kortrijk Xpo Event Chatbot (local dev mode)")
+    parser.add_argument("--data", default="full_site_data.json", help="Path to JSON data produced by the scraper")
+    args = parser.parse_args()
+
+    if not os.path.exists(args.data):
+        print(f"Warning: data file '{args.data}' does not exist yet. Make sure to run a scraper first.")
+
+    chatbot = EventChatbot(data_path=args.data)
     if not chatbot.events: # Check if events list is empty after __init__
-        print("Chatbot cannot start effectively as no event data was loaded. Please check 'full_site_data.json'.")
+        print(f"Chatbot cannot start effectively as no event data was loaded. Please check '{args.data}'.")
     else:
         print("Welcome to the Kortrijk Xpo Event Assistant! Type 'quit' to exit.")
         while True:
