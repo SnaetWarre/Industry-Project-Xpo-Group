@@ -15,12 +15,13 @@ class XpoEventSpider(CrawlSpider):
         # Rule to follow event detail pages from kortrijkxpo.com
         Rule(
             LinkExtractor(
-                allow=('/kalender/event/pxk/\\d+/[^/]+/$',),  # Properly escaped \d+ in normal string
-                deny=('/kalender/event/pxk/\\d+/[^/]+/.+/$',), # Properly escaped \d+ in normal string, deny deeper paths
+                allow=('/kalender/event/pxk/\\\\d+/[^/]+/$/',),  # Corrected: plain string, trailing slash in regex
+                deny=('/kalender/event/pxk/\\\\d+/[^/]+/.+/$',), # Corrected: plain string, trailing slash in regex
                 allow_domains=['kortrijkxpo.com'] 
             ),
             callback='parse_event_detail',
-            follow=True # Follow links from start_urls to find event pages
+            follow=True, 
+            process_links='_process_event_links' 
         ),
     )
 
@@ -35,6 +36,80 @@ class XpoEventSpider(CrawlSpider):
         # For ensuring an event item (with all its external data) is added only once to self.events
         self.completed_event_identifiers = set()
 
+    def _process_event_links(self, links):
+        # Organise links by event ID
+        # Event ID is assumed to be the number after '/kalender/event/pxk/'
+        # Link URLs are like: https://www.kortrijkxpo.com/kalender/event/pxk/EVENT_ID/LANG_OR_SLUG/
+        
+        event_links_map = {} # Key: event_id, Value: dict of {'en': link, 'default': link, 'other_langs': []}
+        
+        # Regex to extract event ID and the segment that might be a language or slug
+        # Path examples:
+        # /kalender/event/pxk/12345/en/
+        # /kalender/event/pxk/12345/event-slug-actual/
+        # Added optional trailing slash to regex pattern to be more robust
+        link_pattern = re.compile(r"/kalender/event/pxk/(\d+)/([^/]+)/?$")
+
+        temp_processed_links_for_map_logic = [] # To avoid modifying 'links' list while iterating if needed elsewhere
+
+        for link_obj in links:
+            path = urlparse(link_obj.url).path
+            match = link_pattern.match(path)
+            if match:
+                event_id = match.group(1)
+                segment = match.group(2).lower()
+                
+                if event_id not in event_links_map:
+                    event_links_map[event_id] = {'en': None, 'default': None, 'other_langs': [], 'original_links': []}
+                
+                event_links_map[event_id]['original_links'].append(link_obj) # Keep track of all links for an ID
+
+                if segment == 'en':
+                    event_links_map[event_id]['en'] = link_obj
+                elif segment not in ['nl', 'fr']: 
+                    event_links_map[event_id]['default'] = link_obj
+                else:
+                    event_links_map[event_id]['other_langs'].append(link_obj)
+            else:
+                # This link did not match the event pattern. Add it directly to processed_links.
+                # These are links that LinkExtractor allowed but don't fit our specific event pattern.
+                # (e.g. other links on the page not matching /kalender/event/pxk/ID/SLUG/)
+                temp_processed_links_for_map_logic.append(link_obj)
+                self.logger.debug(f"Kept non-event-pattern link directly: {link_obj.url}")
+
+
+        final_processed_links = []
+        # Add links that didn't match the event pattern first
+        final_processed_links.extend(temp_processed_links_for_map_logic)
+        
+        processed_event_ids = set()
+
+        for event_id, link_options in event_links_map.items():
+            chosen_link = None
+            if link_options['en']:
+                chosen_link = link_options['en']
+                self.logger.debug(f"Event ID {event_id}: Selected EN link: {chosen_link.url}")
+            elif link_options['default']:
+                chosen_link = link_options['default']
+                self.logger.debug(f"Event ID {event_id}: No EN link, selected default link: {chosen_link.url}")
+            else:
+                if link_options['other_langs']:
+                    self.logger.debug(f"Event ID {event_id}: No EN or default link. Skipping other languages: {[l.url for l in link_options['other_langs']]}")
+                # If no 'en', 'default', or even 'other_langs' (empty original_links for id), log it.
+                elif not link_options['original_links']:
+                     self.logger.debug(f"Event ID {event_id}: No links found or matched for this ID after initial parse.")
+                else: # Has original links, but none fit criteria (e.g. only NL/FR and no default found)
+                    self.logger.debug(f"Event ID {event_id}: No EN or default. Original links for this ID did not yield a primary choice.")
+
+            if chosen_link:
+                final_processed_links.append(chosen_link)
+                processed_event_ids.add(event_id)
+
+        # Logging for transparency
+        if len(links) != len(final_processed_links):
+            self.logger.info(f"Link filtering: Original links {len(links)}, Processed links {len(final_processed_links)}.")
+        
+        return final_processed_links
 
     def _extract_text_content(self, response):
         # Extracts and cleans text from the body, excluding script and style tags
