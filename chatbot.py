@@ -11,7 +11,7 @@ class EventChatbot:
     def __init__(self, data_path: str = "full_site_data.json"):
         # Initialize Ollama with DeepSeek model
         self.data_path = data_path # Store the path for later logic
-        self.llm = Ollama(model="llama3")
+        self.llm = Ollama(model="llama3:8b", num_ctx=8192)
         
         # Load events
         self.events: List[Dict] = []
@@ -100,7 +100,7 @@ class EventChatbot:
         print(f"[DEBUG _extract_keywords_from_input] Extracted: {keywords} from '{user_input}'")
         return list(set(keywords)) # Return unique keywords
 
-    def _get_contextual_snippet(self, text: str, keyword: str, window_size: int = 1000) -> Optional[str]:
+    def _get_contextual_snippet(self, text: str, keyword: str, window_size: int = 4096) -> Optional[str]: #4096 bc apparently that is max for our model
         """Extracts a snippet of text around the first occurrence of a keyword."""
         try:
             text_lower = text.lower()

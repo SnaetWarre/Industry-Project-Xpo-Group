@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choosing the Right AI for Our Event Chatbot</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            margin: 20px;
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+        }
+        h1 {
+            color: #0056b3; /* A friendly blue */
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        h2 {
+            color: #0056b3;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-top: 35px;
+            font-size: 1.4em;
+        }
+        .intro-text {
+            text-align: center;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            color: #5a5a5a;
+        }
+        .approach {
+            margin-bottom: 35px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: #fdfdfd;
+        }
+        .approach h3 {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom:10px;
+        }
+        .pros, .cons {
+            padding-left: 20px;
+        }
+        .pros li, .cons li {
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        .pros li::before {
+            content: "✔ ";
+            color: #28a745; /* Green check for pros */
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .cons li::before {
+            content: "✘ ";
+            color: #dc3545; /* Red X for cons */
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        ul {
+            list-style-type: none; /* Remove default bullets */
+            padding-left: 0;
+        }
+        strong {
+            font-weight: 600; /* Slightly less heavy than default bold */
+        }
+        .summary {
+            margin-top: 40px;
+            padding: 15px;
+            background-color: #e9f5ff; /* Light blue background for summary */
+            border-left: 5px solid #0056b3;
+            border-radius: 5px;
+        }
+        .summary p {
+            margin: 0;
+            font-size: 1.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Choosing the Right AI for Our Event Chatbot</h1>
+        <p class="intro-text">
+            To make our event chatbot smart and helpful, we need to choose the best "brain" for it.
+            Here's a look at different ways we can do this, with their good points and potential downsides, keeping our project goals and your needs in mind.
+        </p>
+
+        <div class="approach">
+            <h2>1. Using a "Home-Grown" AI on a Laptop</h2>
+            <h3>(Like our current experimental setup)</h3>
+            <p>This means we run the AI software directly on a standard laptop. It's like having a small, dedicated helper working right here.</p>
+            <ul class="pros">
+                <li><strong>Your Data Stays With You:</strong> All information about events and user chats remains private on the laptop.</li>
+                <li><strong>No Ongoing AI Fees:</strong> Once set up, there are no extra costs for the AI to answer questions.</li>
+                <li><strong>Works Offline:</strong> The chatbot can still work even if there's no internet.</li>
+                <li><strong>Great for Learning:</strong> Helps us understand how these AIs work from the inside out.</li>
+            </ul>
+            <ul class="cons">
+                <li><strong>Limited Power:</strong> A laptop can only handle so much. This might mean slower answers or not being able to process very complex questions or lots of event details at once.</li>
+                <li><strong>Can Be Slow:</strong> More advanced AI or lots of data can make it sluggish.</li>
+                <li><strong>Needs Technical Setup:</strong> Requires some technical know-how to get it running and keep it updated.</li>
+                <li><strong>Not for Heavy Use:</strong> Might struggle if many people try to use it at the same time.</li>
+            </ul>
+        </div>
+
+        <div class="approach">
+            <h2>2. Using School's AI Infrastructure (For Project Development)</h2>
+            <p>Our school has powerful computers designed for AI tasks. We could potentially use these resources to build and test our chatbot during the project phase. This gives the AI more "horsepower" than a standard laptop.</p>
+            <ul class="pros">
+                <li><strong>Excellent for Project Stage:</strong> Access to significant computing power could allow us to build a more advanced and faster chatbot for demonstration and initial testing.</li>
+                <li><strong>Cost-Effective for Development:</strong> Using these resources for the project could be free or very low-cost, saving budget during development.</li>
+                <li><strong>Good Data Control (During Project):</strong> If using the school's private systems, we maintain good control over project data.</li>
+                <li><strong>Ideal for Experimentation:</strong> Allows us to experiment with more demanding AI setups without personal hardware limits during development.</li>
+            </ul>
+            <ul class="cons">
+                <li><strong>Not a Long-Term Solution for Production:</strong> While great for the project, the school likely cannot host the live chatbot for an external client indefinitely or for free. A different hosting solution would be needed for the final product.</li>
+                <li><strong>Permission & Access Dependent:</strong> We would need to confirm if we can use these resources and understand any rules or limitations.</li>
+                <li><strong>Transition Required Later:</strong> We would need to plan and execute a move to a commercial provider if the chatbot goes into full production.</li>
+                <li><strong>Setup & Management:</strong> May still require some technical effort to set up and manage on the school's systems, even if temporary.</li>
+            </ul>
+        </div>
+
+        <div class="approach">
+            <h2>3. Using a Top-Tier "AI Brain" from a Specialist Company (like ChatGPT-4o)</h2>
+            <h3>(We still provide our scraped event data)</h3>
+            <p>This option involves "renting" time on a very advanced AI, like ChatGPT, that's run by a big company. We would feed it our collected event information to answer questions.</p>
+            <ul class="pros">
+                <li><strong>Very Smart & Capable:</strong> Access to one of the best AIs available, which understands questions very well.</li>
+                <li><strong>Handles Lots of Info:</strong> Can easily work with all our event details and long conversations.</li>
+                <li><strong>Always On & Ready:</strong> These services are built to be reliable and handle many users.</li>
+                <li><strong>No Computer Worries for Us:</strong> The AI company handles all the powerful computers needed.</li>
+                <li><strong>Quick to Get Started with AI:</strong> We can focus on our chatbot's features, not the AI's plumbing.</li>
+            </ul>
+            <ul class="cons">
+                <li><strong>Pay-As-You-Go Costs:</strong> We'd pay based on how much we use it, which could add up with many users or questions.</li>
+                <li><strong>Data Goes to a Third Party:</strong> Event details and user chats are sent to the AI company's computers.</li>
+                <li><strong>Relies on Another Company:</strong> We depend on their service, pricing, and rules.</li>
+                <li><strong>Less "Under the Hood" Control:</strong> We can't change the core AI itself, only how we ask it questions.</li>
+                <li><strong>We Still Manage Event Data:</strong> We would still need to collect and update our event information.</li>
+            </ul>
+        </div>
+
+        <div class="approach">
+            <h2>4. Using an "AI Search Specialist" (like Perplexity API)</h2>
+            <h3>(May reduce some of our data collection work)</h3>
+            <p>This is like hiring an AI that's an expert at finding information on the internet. It could answer some questions using live web data, possibly reducing our need to manually collect *everything*.</p>
+            <ul class="pros">
+                <li><strong>Gets Live Info:</strong> Can find the very latest details online, which is great for things that change often.</li>
+                <li><strong>Always Up-to-Date:</strong> Can provide answers based on current web information.</li>
+                <li><strong>Potentially Simpler Data Management for Us:</strong> Might mean less work for us in constantly updating some types of event details.</li>
+                <li><strong>Always On & Ready:</strong> Reliable service managed by the AI company.</li>
+                <li><strong>No Computer Worries for Us:</strong> They handle the technical side.</li>
+            </ul>
+            <ul class="cons">
+                <li><strong>Pay-As-You-Go Costs:</strong> Similar to other API services, usage incurs costs.</li>
+                <li><strong>Data Goes to a Third Party:</strong> User questions are sent to their servers.</li>
+                <li><strong>Relies on Another Company:</strong> We depend on their service and terms.</li>
+                <li><strong>Less Control Over Info Sources:</strong> While it searches online, we don't fully control where it looks or what it prioritizes compared to our own curated event list.</li>
+                <li><strong>Balancing Our Data and Its Searches:</strong> We'd need to ensure it uses our specific event list (the `full_site_data.json`) effectively, and decide when it should use its web search instead. It might not automatically know everything about our specific, local events without us telling it.</li>
+            </ul>
+        </div>
+
+        <div class="approach">
+            <h2>Illustrative Cost Scenarios for API-Based Solutions</h2>
+            <p>The following images provide a snapshot of potential costs associated with different AI models when using their APIs. These are based on specific assumptions (e.g., 1,000 requests, input data size) and are for illustrative purposes to highlight relative differences.</p>
+
+            <h3>Scenario 1: No Web Search + 30MB JSON File Input</h3>
+            <img src="scenario1_pricing.png" alt="Pricing breakdown for Scenario 1: No Web Search + 30MB JSON File" style="width:100%; max-width:700px; display:block; margin:10px auto; border:1px solid #ddd; border-radius:5px;">
+            <p style="text-align:center; font-size:0.9em; color:#555;">This scenario reflects costs primarily driven by processing a large local JSON data file (e.g., `full_site_data.json`) with each request.</p>
+
+            <h3>Scenario 2: Web Search Only</h3>
+            <img src="scenario2_pricing.png" alt="Pricing breakdown for Scenario 2: Web Search Only" style="width:100%; max-width:700px; display:block; margin:10px auto; border:1px solid #ddd; border-radius:5px;">
+            <p style="text-align:center; font-size:0.9em; color:#555;">This scenario reflects costs driven by API calls that primarily perform web searches, without large local data inputs.</p>
+
+            <h3>Consolidated API Pricing Overview (1,000 Requests)</h3>
+            <table style="width:100%; max-width:700px; margin: 20px auto; border-collapse: collapse; font-size: 0.9em;">
+                <thead>
+                    <tr style="background-color: #e9f5ff; border-bottom: 2px solid #0056b3;">
+                        <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">API</th>
+                        <th style="padding: 10px; text-align: left; border-right: 1px solid #ddd;">Scenario 1 Cost (30MB JSON)</th>
+                        <th style="padding: 10px; text-align: left;">Scenario 2 Cost (Web Search Only)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px; border-right: 1px solid #eee;">Perplexity</td>
+                        <td style="padding: 8px; border-right: 1px solid #eee;">$5,625.00</td>
+                        <td style="padding: 8px;">$14.00</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #eee; background-color: #fdfdfd;">
+                        <td style="padding: 8px; border-right: 1px solid #eee;">Gemini 2.5 Pro</td>
+                        <td style="padding: 8px; border-right: 1px solid #eee;">$4,687.50</td>
+                        <td style="padding: 8px;">$35.00 (after 1,500 free/day)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px; border-right: 1px solid #eee;">ChatGPT 4o</td>
+                        <td style="padding: 8px; border-right: 1px solid #eee;">$4,687.50</td>
+                        <td style="padding: 8px;">$30 - $90</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #eee; background-color: #fdfdfd;">
+                        <td style="padding: 8px; border-right: 1px solid #eee;">Qwen2.5 Max</td>
+                        <td style="padding: 8px; border-right: 1px solid #eee;">$3,000.00</td>
+                        <td style="padding: 8px;">N/A (Unsupported)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px; border-right: 1px solid #eee;">DeepSeek V3</td>
+                        <td style="padding: 8px; border-right: 1px solid #eee;">$506.25</td>
+                        <td style="padding: 8px;">N/A (Unsupported)</td>
+                    </tr>
+                    <tr style="background-color: #fdfdfd;">
+                        <td style="padding: 8px; border-right: 1px solid #eee;">Gemini 2.0 Flash</td>
+                        <td style="padding: 8px; border-right: 1px solid #eee;">$187.50</td>
+                        <td style="padding: 8px;">$35.00 (after 500 free/day)</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:center; font-size:0.85em; color:#777; max-width: 700px; margin: 10px auto;">
+                <em>Note: Scenario 1 costs are based on processing a 30MB JSON file (approx. 1.875M tokens) per request. Scenario 2 costs are based on web search API calls only. "N/A" indicates the model does not support the functionality or pricing was not available for that specific scenario. Gemini 2.0 Flash web search cost is an assumption.</em>
+            </p>
+
+            <p>Note: Gemini 2.0 offers 500 complimentary API requests per day, which exceeds our testing requirements. However, the adequacy of this quota for production deployment remains to be evaluated.</p>
+        </div>
+
+        <div class="summary">
+            <p><strong>In short:</strong> Each approach has its trade-offs between cost, control, ease of use, and the power of the AI. The best choice depends on our priorities for the event chatbot, budget, and how much control we want over the technology and data. We can discuss which factors are most important for your needs.</p>
+        </div>
+    </div>
+</body>
+</html>
