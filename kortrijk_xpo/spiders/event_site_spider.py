@@ -1,6 +1,9 @@
 import scrapy
 from urllib.parse import urlparse, urlunparse
 import re # Import re
+import subprocess # Added for running clean_json.py
+from pathlib import Path # Added for path manipulation
+from scrapy import signals # Added for spider_closed signal
 
 class EventSiteSpider(scrapy.Spider):
     """Generic spider for crawling an entire single external event website,
@@ -47,6 +50,9 @@ class EventSiteSpider(scrapy.Spider):
     # ---------------------------------------------------------------------
     def parse(self, response: scrapy.http.Response):
         url = response.url
+        if url.lower().endswith(".pdf"):
+            self.logger.info(f"Skipping PDF file: {url}")
+            return
         if url in self._visited:
             return
         self._visited.add(url)
@@ -89,6 +95,11 @@ class EventSiteSpider(scrapy.Spider):
         for href in response.css("a[href]::attr(href)").getall():
             full_url = response.urljoin(href)
             parsed_url = urlparse(full_url)
+            
+            # Skip PDF files
+            if parsed_url.path.lower().endswith(".pdf"):
+                self.logger.debug(f"Skipping PDF link: {full_url}")
+                continue
             
             # Ensure it's http/https, stays on the same domain, and not yet visited
             if (parsed_url.scheme in {"http", "https"} and
@@ -237,3 +248,72 @@ class EventSiteSpider(scrapy.Spider):
             self.logger.debug(f"Language filtering: no change in link count ({len(links)}).")
             
         return final_links_to_follow 
+
+    @classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        spider = super(EventSiteSpider, cls).from_crawler(crawler, *args, **kwargs)
+        crawler.signals.connect(spider.spider_closed, signal=signals.spider_closed)
+        return spider
+
+    def spider_closed(self, spider, reason):
+        spider.logger.info(f"Spider closed: {spider.name}, reason: {reason}")
+
+        feeds = self.settings.get('FEEDS')
+        if not feeds:
+            spider.logger.warning("No FEEDS setting found. Cannot determine output file for cleaning.")
+            return
+
+        # FEEDS is a dictionary where keys are URIs (file paths) and values are dicts with format, etc.
+        # We'll take the first one, assuming one output file.
+        # If -O is used, FEEDS will look like: {'output.json': {'format': 'json', ...}}
+        # If FEEDS setting is used, it might be like: {'file:///path/to/output.json': {'format': 'json', ...}}
+        
+        output_uri = list(feeds.keys())[0]
+        
+        # Convert URI to path
+        if output_uri.startswith('file://'):
+            output_file_path = Path(urlparse(output_uri).path)
+        else:
+            # Assume it's a relative or absolute path if no scheme (e.g. from -O option)
+            output_file_path = Path(output_uri)
+
+
+        if not output_file_path.exists():
+            spider.logger.error(f"Output file {output_file_path} not found. Cannot clean.")
+            return
+
+        clean_script_path = Path(__file__).resolve().parent.parent.parent / "clean_json.py" # Assumes clean_json.py is in the project root
+
+        if not clean_script_path.exists():
+            spider.logger.error(f"clean_json.py script not found at {clean_script_path}. Cannot clean the output.")
+            return
+            
+        # Command to clean the JSON file in place, with indentation, collapse whitespace, and remove non-ASCII
+        cmd = [
+            "python",
+            str(clean_script_path),
+            str(output_file_path),
+            "-o",
+            str(output_file_path), # Output to the same file
+            "-i", # Indent
+            "-c", # Collapse values
+            "--remove-non-ascii" # Remove non-ASCII
+        ]
+
+        try:
+            spider.logger.info(f"Running clean_json.py on {output_file_path}...")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            spider.logger.info(f"""clean_json.py output:
+{result.stdout}""")
+            if result.stderr:
+                 spider.logger.warning(f"""clean_json.py errors/warnings:
+{result.stderr}""")
+            spider.logger.info(f"Successfully cleaned {output_file_path}.")
+        except subprocess.CalledProcessError as e:
+            spider.logger.error(f"Error running clean_json.py on {output_file_path}:")
+            spider.logger.error(f"Command: {' '.join(e.cmd)}")
+            spider.logger.error(f"Return code: {e.returncode}")
+            spider.logger.error(f"Stdout: {e.stdout}")
+            spider.logger.error(f"Stderr: {e.stderr}")
+        except FileNotFoundError:
+            spider.logger.error(f"Error: clean_json.py script not found at {clean_script_path} or python interpreter not found.") 

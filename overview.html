@@ -115,25 +115,16 @@
             </ul>
         </div>
 
+        <!--
         <div class="approach">
             <h2>2. Using School's AI Infrastructure (For Project Development)</h2>
             <p>Our school has powerful computers designed for AI tasks. We could potentially use these resources to build and test our chatbot during the project phase. This gives the AI more "horsepower" than a standard laptop.</p>
-            <ul class="pros">
-                <li><strong>Excellent for Project Stage:</strong> Access to significant computing power could allow us to build a more advanced and faster chatbot for demonstration and initial testing.</li>
-                <li><strong>Cost-Effective for Development:</strong> Using these resources for the project could be free or very low-cost, saving budget during development.</li>
-                <li><strong>Good Data Control (During Project):</strong> If using the school's private systems, we maintain good control over project data.</li>
-                <li><strong>Ideal for Experimentation:</strong> Allows us to experiment with more demanding AI setups without personal hardware limits during development.</li>
-            </ul>
-            <ul class="cons">
-                <li><strong>Not a Long-Term Solution for Production:</strong> While great for the project, the school likely cannot host the live chatbot for an external client indefinitely or for free. A different hosting solution would be needed for the final product.</li>
-                <li><strong>Permission & Access Dependent:</strong> We would need to confirm if we can use these resources and understand any rules or limitations.</li>
-                <li><strong>Transition Required Later:</strong> We would need to plan and execute a move to a commercial provider if the chatbot goes into full production.</li>
-                <li><strong>Setup & Management:</strong> May still require some technical effort to set up and manage on the school's systems, even if temporary.</li>
-            </ul>
+            // ... section temporarily hidden to focus on three main options ...
         </div>
+        -->
 
         <div class="approach">
-            <h2>3. Using a Top-Tier "AI Brain" from a Specialist Company (like ChatGPT-4o)</h2>
+            <h2>2. Using a Paid Cloud AI Service (e.g., ChatGPT-4o)</h2>
             <h3>(We still provide our scraped event data)</h3>
             <p>This option involves "renting" time on a very advanced AI, like ChatGPT, that's run by a big company. We would feed it our collected event information to answer questions.</p>
             <ul class="pros">
@@ -152,25 +143,45 @@
             </ul>
         </div>
 
+        <!--
         <div class="approach">
             <h2>4. Using an "AI Search Specialist" (like Perplexity API)</h2>
-            <h3>(May reduce some of our data collection work)</h3>
-            <p>This is like hiring an AI that's an expert at finding information on the internet. It could answer some questions using live web data, possibly reducing our need to manually collect *everything*.</p>
+            // ... section hidden ...
+        </div>
+        -->
+
+        <div class="approach">
+            <h2>3. Vector Search + Embeddings with a Dedicated Database</h2>
+            <h3>(Our data lives in a fast search index; the LLM focuses on answers)</h3>
+            <p>We turn every exhibitor page, programme item, and practical detail into numerical <em>embeddings</em> and store them in a vector database such as MongoDB. Each visitor question is embedded, matched to the most relevant snippets in milliseconds, and those snippets are fed to a lightweight LLM (local&nbsp;<em>or</em>&nbsp;cloud-hosted) to craft the reply.</p>
             <ul class="pros">
-                <li><strong>Gets Live Info:</strong> Can find the very latest details online, which is great for things that change often.</li>
-                <li><strong>Always Up-to-Date:</strong> Can provide answers based on current web information.</li>
-                <li><strong>Potentially Simpler Data Management for Us:</strong> Might mean less work for us in constantly updating some types of event details.</li>
-                <li><strong>Always On & Ready:</strong> Reliable service managed by the AI company.</li>
-                <li><strong>No Computer Worries for Us:</strong> They handle the technical side.</li>
+                <li><strong>Privacy & Control:</strong> All FFD content stays on our own server; only small context chunks reach the LLM.</li>
+                <li><strong>Low Running Costs:</strong> Vector search is cheap; embeddings are computed once and reused.</li>
+                <li><strong>Fast Retrieval:</strong> Sub-second answers even with tens of thousands of documents.</li>
+                <li><strong>Easy to Scale:</strong> Add new editions or languages without retraining a gigantic model.</li>
+                <li><strong>Model-Agnostic:</strong> We can swap the LLM (local laptop ↔ cloud API) without touching the database layer.</li>
             </ul>
             <ul class="cons">
-                <li><strong>Pay-As-You-Go Costs:</strong> Similar to other API services, usage incurs costs.</li>
-                <li><strong>Data Goes to a Third Party:</strong> User questions are sent to their servers.</li>
-                <li><strong>Relies on Another Company:</strong> We depend on their service and terms.</li>
-                <li><strong>Less Control Over Info Sources:</strong> While it searches online, we don't fully control where it looks or what it prioritizes compared to our own curated event list.</li>
-                <li><strong>Balancing Our Data and Its Searches:</strong> We'd need to ensure it uses our specific event list (the `full_site_data.json`) effectively, and decide when it should use its web search instead. It might not automatically know everything about our specific, local events without us telling it.</li>
+                <li><strong>Setup Overhead:</strong> We must generate embeddings and host/maintain the vector DB.</li>
+                <li><strong>DevOps Required:</strong> Backups, monitoring, and security patches for the DB.</li>
+                <li><strong>Needs an LLM:</strong> Retrieval alone isn't conversational; we still run/pay a language model.</li>
+                <li><strong>Content Freshness Pipeline:</strong> Website updates should trigger re-embedding.</li>
             </ul>
         </div>
+
+        <!--
+        <div class="approach">
+            <h2>6. Full Open-Source Chatbot Frameworks (Rasa, Botpress, LangChain Agents…)</h2>
+            // ... section hidden ...
+        </div>
+        -->
+
+        <!--
+        <div class="approach">
+            <h2>7. No-Code / Low-Code Chatbot Builders & Widgets (ChatBot.com, Zapier Chatbots, Intercom, Tidio…)</h2>
+            // ... section hidden ...
+        </div>
+        -->
 
         <div class="approach">
             <h2>Illustrative Cost Scenarios for API-Based Solutions</h2>
@@ -234,7 +245,7 @@
         </div>
 
         <div class="summary">
-            <p><strong>In short:</strong> Each approach has its trade-offs between cost, control, ease of use, and the power of the AI. The best choice depends on our priorities for the event chatbot, budget, and how much control we want over the technology and data. We can discuss which factors are most important for your needs.</p>
+            <p><strong>In short:</strong> We've narrowed things down to <strong>three</strong> clear paths: a self-hosted local model, a privacy-friendly vector-search setup, and a pay-as-you-go cloud API. Each balances control, cost, and effort differently—let's decide which mix best fits Flanders&nbsp;Flooring&nbsp;Days.</p>
         </div>
     </div>
 </body>

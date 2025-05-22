@@ -104,31 +104,5 @@ Key points:
 
 ---
 
-## 9. Team & responsibilities
-| Name | Role | Focus this quarter |
-|------|------|--------------------|
-| Warre | Tech lead | Backend API, embeddings store |
-| Jonas | Product owner (client) | Requirements, stakeholder feedback |
-| Student A | Scrapy extensions | New site crawlers, post-processing |
-| Student B | Front-end widget | JS bundle, design QA |
-| Student C | DevOps | Docker, CI/CD, monitoring |
 
----
-
-## 10. Risks & mitigations
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|-----------|
-| LLM hallucination | Med | High | Strict prompt: "Answer only from context", add citation links |
-| Site layout breaks scraper | High | Med | Config-driven selectors, nightly tests |
-| Widget blocked by CSP headers | Med | Med | Serve from same domain or use `nonce` attr |
-| API latency > 3 s | Med | High | Cache frequent Qs, warm-up embeddings, GPU for LLM |
-| GDPR breach | Low | High | Anonymise logs, provide opt-out |
-
----
-
-## 11. Next steps (this week)
-1. Merge this `plan.md` into `main`.
-2. Create GitHub project board with phases & issues (link tasks to roadmap above).
-3. Kick-off meeting with Jonas (Thu) to confirm scope & branding guidelines.
-4. Start Phase 1: duplicate existing spider, wire basic crawl of FFD homepage, validate output.
 
