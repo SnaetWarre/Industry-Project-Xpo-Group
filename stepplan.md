@@ -17,7 +17,7 @@ This document outlines the steps to modify the existing chatbot application to u
    - **Task:** Initialize the database/collection where embeddings will be stored.
 
 ### Step 2: Review `clean_json.py` Output
-   - **Action:** Ensure the `output.clean.json` (or the file produced by `clean_json.py`) is well-structured and contains all necessary fields for each event (e.g., `title`, `description`, `raw_text_content`, `url`, `stand_numbers`, `socialmedia_links`).
+   - **Action:** Ensure the `output.clean.json` (or the file produced by `clean_json.py`) is well-structured and contains all necessary fields for each event 
    - **Task:** Verify that text fields are clean enough for effective embedding (e.g., excessive noise or irrelevant boilerplate removed). The current `clean_json.py` script's collapsing and non-ASCII removal options are good.
 
 ## Phase 2: Embedding Generation and Storage
