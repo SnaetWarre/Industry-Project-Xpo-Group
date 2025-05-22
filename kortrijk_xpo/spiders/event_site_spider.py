@@ -4,6 +4,7 @@ import re # Import re
 import subprocess # Added for running clean_json.py
 from pathlib import Path # Added for path manipulation
 from scrapy import signals # Added for spider_closed signal
+import time
 
 class EventSiteSpider(scrapy.Spider):
     """Generic spider for crawling an entire single external event website,
@@ -277,9 +278,22 @@ class EventSiteSpider(scrapy.Spider):
             # Assume it's a relative or absolute path if no scheme (e.g. from -O option)
             output_file_path = Path(output_uri)
 
+        # Add a small delay to ensure file is written
+        max_retries = 5
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            if output_file_path.exists() and output_file_path.stat().st_size > 0:
+                break
+            spider.logger.info(f"Waiting for output file to be written (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(retry_delay)
 
         if not output_file_path.exists():
-            spider.logger.error(f"Output file {output_file_path} not found. Cannot clean.")
+            spider.logger.error(f"Output file {output_file_path} not found after {max_retries} attempts. Cannot clean.")
+            return
+
+        if output_file_path.stat().st_size == 0:
+            spider.logger.error(f"Output file {output_file_path} exists but is empty. Cannot clean.")
             return
 
         clean_script_path = Path(__file__).resolve().parent.parent.parent / "clean_json.py" # Assumes clean_json.py is in the project root
@@ -294,7 +308,7 @@ class EventSiteSpider(scrapy.Spider):
             str(clean_script_path),
             str(output_file_path),
             "-o",
-            str(output_file_path), # Output to the same file
+            str(output_file_path.with_suffix('.clean.json')), # Output to a separate clean file
             "-i", # Indent
             "-c", # Collapse values
             "--remove-non-ascii" # Remove non-ASCII

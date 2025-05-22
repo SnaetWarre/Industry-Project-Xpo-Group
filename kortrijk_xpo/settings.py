@@ -20,10 +20,6 @@ DOWNLOADER_MIDDLEWARES = {
     "kortrijk_xpo.middlewares.KortrijkXpoDownloaderMiddleware": 543,
 }
 
-# Configure item pipelines
-ITEM_PIPELINES = {
-    "kortrijk_xpo.pipelines.KortrijkXpoPipeline": 300,
-}
 
 # Enable and configure HTTP caching
 HTTPCACHE_ENABLED = False

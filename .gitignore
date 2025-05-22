@@ -5,3 +5,6 @@ __pycache__
 *.pyw
 *.pyz
 *.pywz
+
+output.json
+ffd_site_data.json

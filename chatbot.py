@@ -35,7 +35,7 @@ class EventChatbot:
         self.memory = ConversationBufferMemory()
         
         # The {input} to the prompt will now be a formatted string containing both the event context and the user's actual question.
-        template = """You are a helpful assistant that recommends events from Kortrijk Xpo.
+        template = """You are a helpful assistant that recommends events from Kortrijk Xpo.<
         The user's query is preceded by relevant event information if any was found.
         Use ONLY the provided event information to answer the user's question about event titles, descriptions, URLs, social media links, and other details like pricing or dates if present.
         If the user asks for a link, provide the 'URL' or 'Social Links' for the relevant event if available in the provided event information.
@@ -302,7 +302,7 @@ User's Question: {user_input}"""
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kortrijk Xpo Event Chatbot (local dev mode)")
-    parser.add_argument("--data", default="full_site_data.json", help="Path to JSON data produced by the scraper")
+    parser.add_argument("--data", default="output.json", help="Path to JSON data produced by the scraper")
     args = parser.parse_args()
 
     if not os.path.exists(args.data):
