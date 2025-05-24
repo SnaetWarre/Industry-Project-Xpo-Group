@@ -10,16 +10,24 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 8
+CONCURRENT_REQUESTS = 64
+
+# Configure maximum concurrent requests per domain
+CONCURRENT_REQUESTS_PER_DOMAIN = 32
 
 # Configure a delay for requests for the same website (default: 0)
-DOWNLOAD_DELAY = 1
+DOWNLOAD_DELAY = 0.0
 
 # Enable or disable downloader middlewares
 DOWNLOADER_MIDDLEWARES = {
     "Scraper.middlewares.KortrijkXpoDownloaderMiddleware": 543,
+    "scrapy.downloadermiddlewares.retry.RetryMiddleware": 550,
 }
 
+# Retry settings
+RETRY_ENABLED = True
+RETRY_TIMES = 3  # Maximum number of retries
+RETRY_HTTP_CODES = [500, 502, 503, 504, 522, 524, 408, 429]  # HTTP status codes to retry on
 
 # Enable and configure HTTP caching
 HTTPCACHE_ENABLED = False
