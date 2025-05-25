@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 import argparse, os
 
 class EventChatbot:
-    def __init__(self, data_path: str = "full_site_data.json"):
+    def __init__(self, data_path: str = "data/processed/ffd_site_data_cleaned.json"):
         # Initialize Ollama with DeepSeek model
         self.data_path = data_path # Store the path for later logic
         self.llm = Ollama(model="gemma3:4b", num_ctx=128000)
@@ -302,7 +302,7 @@ User's Question: {user_input}"""
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kortrijk Xpo Event Chatbot (local dev mode)")
-    parser.add_argument("--data", default="output.json", help="Path to JSON data produced by the scraper")
+    parser.add_argument("--data", default="data/processed/ffd_site_data_cleaned.json", help="Path to JSON data produced by the scraper")
     args = parser.parse_args()
 
     if not os.path.exists(args.data):
