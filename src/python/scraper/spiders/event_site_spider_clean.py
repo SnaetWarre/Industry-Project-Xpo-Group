@@ -5,6 +5,8 @@ import json
 from scrapy import signals
 from scrapy.extensions.feedexport import FeedExporter
 import time
+import os
+import shutil
 
 class EventSiteSpiderClean(EventSiteSpider):
     """A version of EventSiteSpider that automatically cleans the JSON output after crawling.
@@ -31,17 +33,28 @@ class EventSiteSpiderClean(EventSiteSpider):
         if not output_file:
             output_file = 'ffd_site_data.json'  # Default to the command line specified file
 
-        # Always place output in data/processed
-        output_file = str(Path('data/processed') / Path(output_file).name)
-        self.logger.info(f"Found output file: {output_file}")
+        # Create data/processed directory if it doesn't exist
+        processed_dir = Path('data/processed')
+        processed_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get the original file location (in root directory)
+        original_file = Path(output_file)
+        if not original_file.exists():
+            self.logger.error(f"Original file not found: {original_file}")
+            return
+
+        # Move the file to data/processed
+        target_file = processed_dir / original_file.name
+        shutil.move(str(original_file), str(target_file))
+        self.logger.info(f"Moved file to: {target_file}")
         
         # Wait a moment for the file to be fully written
         time.sleep(1)
         
         try:
             # Create output filename for cleaned version
-            input_file = output_file
-            output_file = str(Path('data/processed') / (Path(output_file).with_suffix('').name + '_cleaned.json'))
+            input_file = str(target_file)
+            output_file = str(processed_dir / (target_file.with_suffix('').name + '_cleaned.json'))
             
             # Run the cleaning process
             self.logger.info(f"Starting JSON cleaning process: {input_file} -> {output_file}")
