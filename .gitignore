@@ -56,3 +56,7 @@ nupkg/
 # Keep specific data files
 !ffd_site_data_cleaned.json
 !ffd_site_data.json
+!artisan_site_data_cleaned.json
+!artisan_site_data.json
+!abiss_site_data_cleaned.json
+!abiss_site_data.json
