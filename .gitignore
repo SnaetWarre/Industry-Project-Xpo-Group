@@ -47,6 +47,9 @@ nupkg/
 
 # Data files
 *.json
+!appsettings.json
+!appsettings.Development.json
+!appsettings.Production.json
 !package.json
 !tsconfig.json
 !launch.json
