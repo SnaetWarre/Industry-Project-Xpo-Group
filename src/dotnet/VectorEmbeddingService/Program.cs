@@ -11,11 +11,19 @@ builder.Services.AddSwaggerGen();
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowPythonChatbot", policy =>
+    options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        policy.WithOrigins(
+            "https://www.abissummit.be",
+            "https://www.artisan-xpo.be",
+            "https://www.flandersflooringdays.com",
+            "http://localhost:3000",
+            "http://localhost:5173",  // Vite default port
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader();
     });
 });
 
@@ -58,8 +66,21 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Add security headers
+app.Use(async (context, next) =>
+{
+    // Basic security headers that won't interfere with cross-origin embedding
+    context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Add("X-Frame-Options", "SAMEORIGIN");
+    context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Add("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    context.Response.Headers.Add("Content-Security-Policy", "default-src 'self'; connect-src 'self' https://*.openai.azure.com;");
+    context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+    await next();
+});
+
 app.UseHttpsRedirection();
-app.UseCors("AllowPythonChatbot");
+app.UseCors("AllowSpecificOrigins");
 app.UseAuthorization();
 app.MapControllers();
 

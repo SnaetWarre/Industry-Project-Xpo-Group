@@ -5,6 +5,27 @@ import argparse, os
 from vector_api_client import VectorApiClient
 from openai import AzureOpenAI
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+from collections import defaultdict
+import html
+
+class RateLimiter:
+    def __init__(self, max_requests: int = 30, time_window: int = 60):
+        self.max_requests = max_requests
+        self.time_window = time_window  # in seconds
+        self.requests = defaultdict(list)
+    
+    def is_allowed(self, ip: str) -> bool:
+        now = datetime.now()
+        # Clean old requests
+        self.requests[ip] = [req_time for req_time in self.requests[ip] 
+                           if now - req_time < timedelta(seconds=self.time_window)]
+        
+        if len(self.requests[ip]) >= self.max_requests:
+            return False
+            
+        self.requests[ip].append(now)
+        return True
 
 class EventChatbot:
     def __init__(self, api_url: str = "http://localhost:5000"):
@@ -19,6 +40,7 @@ class EventChatbot:
             api_key=self.azure_api_key
         )
         self.vector_client = VectorApiClient(api_url)
+        self.rate_limiter = RateLimiter(max_requests=60, time_window=60)  
         
         # Create conversation memory
         # self.memory = ConversationBufferMemory()
@@ -27,6 +49,23 @@ class EventChatbot:
         self.user_preferences = {
             "interests": [],
         }
+
+    def _sanitize_input(self, text: str) -> str:
+        """Sanitize user input to prevent injection attacks"""
+        if not text or not isinstance(text, str):
+            return ""
+            
+        # Remove any potential script tags
+        text = re.sub(r'<script.*?>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Remove any potential SQL injection patterns
+        text = re.sub(r'(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|--)\b)', '', text, flags=re.IGNORECASE)
+        
+        # HTML escape the text
+        text = html.escape(text)
+        
+        # Limit length
+        return text[:1000]  # Reasonable limit for chat input
 
     def _extract_keywords_from_input(self, user_input: str) -> List[str]:
         # Simple keyword extraction: lowercase, split, and remove common words
@@ -160,11 +199,21 @@ class EventChatbot:
         print(f"[DEBUG get_relevant_events] Found {len(sorted_events)} potentially relevant events. Top scores: {[e['_score'] for e in sorted_events[:5]]}")
         return sorted_events
 
-    def chat(self, user_input: str) -> str:
+    def chat(self, user_input: str, ip_address: str = "unknown") -> str:
         """Process user input and return response"""
-        print(f"[DEBUG chat] Received user_input: '{user_input}'")
+        # Sanitize input first
+        sanitized_input = self._sanitize_input(user_input)
+        if not sanitized_input:
+            return "I couldn't process that input. Please try again with a valid message."
+            
+        # Check rate limit
+        if not self.rate_limiter.is_allowed(ip_address):
+            return "I'm getting a lot of requests right now. Please try again in a minute."
+            
+        print(f"[DEBUG chat] Received user_input: '{sanitized_input}'")
         
-        keywords = self._extract_keywords_from_input(user_input)
+        # Use sanitized input for the rest of the processing
+        keywords = self._extract_keywords_from_input(sanitized_input)
         
         # Update user preferences (simple list for now)
         for kw in keywords:
@@ -173,7 +222,7 @@ class EventChatbot:
         print(f"[DEBUG chat] Updated user_preferences['interests']: {self.user_preferences['interests']}")
 
         # Get relevant events from vector database
-        relevant_events = self.vector_client.search_events(user_input, top_k=5, threshold=0.5)
+        relevant_events = self.vector_client.search_events(sanitized_input, top_k=5, threshold=0.5)
         
         num_events_to_show_in_context = 3 # Limit context to top N events
         
@@ -212,7 +261,7 @@ class EventChatbot:
 {events_context_str}
 
 ---
-User's Question: {user_input}"""
+User's Question: {sanitized_input}"""
 
         print(f"[DEBUG chat] enhanced_input being sent to AzureOpenAI (first 1000000 chars):\n{enhanced_input[:1000000]}...")
 
