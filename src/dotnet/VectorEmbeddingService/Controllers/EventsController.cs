@@ -209,4 +209,51 @@ public class EventsController : ControllerBase
             return StatusCode(500, "An error occurred while getting event count");
         }
     }
+
+    [HttpPost("chat")]
+    public async Task<ActionResult<object>> GetChatbotResponse([FromBody] ChatRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Query))
+            {
+                return BadRequest("Query cannot be empty");
+            }
+
+            // Generate embedding for the search query
+            var queryEmbedding = await _embeddingService.GetEmbeddingAsync(request.Query);
+            
+            // Search for similar events with a lower threshold for more results
+            var similarEvents = await _cosmosDbService.SearchSimilarEventsAsync(
+                queryEmbedding, 
+                request.TopK ?? 5, 
+                request.Threshold ?? 0.5);
+
+            // Format the response for the chatbot
+            var formattedEvents = similarEvents.Select(e => new
+            {
+                Title = e.Title,
+                Description = e.Description,
+                Url = e.Url,
+                StandNumbers = e.StandNumbers,
+                SocialMediaLinks = e.SocialMediaLinks,
+                RawTextContent = e.RawTextContent
+            }).ToList();
+
+            _logger.LogInformation("Chat query processed: '{Query}', found {Count} relevant events", 
+                request.Query, formattedEvents.Count);
+
+            return Ok(new
+            {
+                Query = request.Query,
+                RelevantEvents = formattedEvents,
+                TotalResults = formattedEvents.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing chat query: {Query}", request.Query);
+            return StatusCode(500, "An error occurred while processing your query");
+        }
+    }
 } 
