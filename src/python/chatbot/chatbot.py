@@ -1,50 +1,27 @@
-from langchain_community.llms import Ollama
-from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
 import json
 import re # For more advanced keyword searching
 from typing import List, Dict, Optional
 import argparse, os
 from vector_api_client import VectorApiClient
+from openai import AzureOpenAI
+from dotenv import load_dotenv
 
 class EventChatbot:
     def __init__(self, api_url: str = "http://localhost:5000"):
-        # Initialize Ollama with DeepSeek model
-        self.llm = Ollama(model="gemma3:4b", num_ctx=128000)
+        load_dotenv()
+        self.azure_api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        self.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        self.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+        self.azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+        self.client = AzureOpenAI(
+            api_version=self.azure_api_version,
+            base_url=self.azure_endpoint,
+            api_key=self.azure_api_key
+        )
         self.vector_client = VectorApiClient(api_url)
         
         # Create conversation memory
-        self.memory = ConversationBufferMemory()
-        
-        # The {input} to the prompt will now be a formatted string containing both the event context and the user's actual question.
-        template = """You are a helpful assistant that recommends events from Kortrijk Xpo.
-        The user's query is preceded by relevant event information if any was found.
-        Use ONLY the provided event information to answer the user's question about event titles, descriptions, URLs, social media links, and other details like pricing or dates if present.
-        If the user asks for a link, provide the 'URL' or 'Social Links' for the relevant event if available in the provided event information.
-        If specific information (like ticket prices or exact dates) is not present in the provided event information, clearly state that. Do not make up information.
-        If no relevant event information is provided, inform the user that no matching events were found based on their query.
-
-        Current conversation:
-        {history}
-
-        Human's Query (possibly with preceding event context):
-        {input}
-        
-        Assistant:"""
-        
-        prompt = PromptTemplate(
-            input_variables=["history", "input"],
-            template=template
-        )
-        
-        # Initialize conversation chain once here
-        self.conversation = ConversationChain(
-            llm=self.llm,
-            memory=self.memory,
-            prompt=prompt,
-            verbose=True
-        )
+        # self.memory = ConversationBufferMemory()
         
         # Store user preferences
         self.user_preferences = {
@@ -228,7 +205,7 @@ class EventChatbot:
                 note_str = f"Note: There are {len(relevant_events) - num_events_to_show_in_context} more potentially matching events. You can ask for more details or refine your search."
                 events_context_str += f"\n\n---\n\n{note_str}"
 
-        print(f"[DEBUG chat] events_context_str being sent to LLM (first 500 chars):\n{events_context_str[:1000000]}...")
+        print(f"[DEBUG chat] events_context_str being sent to LLM (first 1000000 chars):\n{events_context_str[:1000000]}...")
 
         # Construct the enhanced input for the LLM
         enhanced_input = f"""Relevant Event Information:
@@ -237,16 +214,22 @@ class EventChatbot:
 ---
 User's Question: {user_input}"""
 
-        print(f"[DEBUG chat] enhanced_input being sent to predict (first 500 chars):\n{enhanced_input[:500]}...")
+        print(f"[DEBUG chat] enhanced_input being sent to AzureOpenAI (first 1000000 chars):\n{enhanced_input[:1000000]}...")
 
         try:
-            # Pass the combined context and question as the single 'input' to the chain
-            response = self.conversation.predict(input=enhanced_input)
+            response = self.client.chat.completions.create(
+                model=self.azure_deployment,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that recommends events from Kortrijk Xpo. Use ONLY the provided event information to answer the user's question. If no relevant event information is provided, inform the user that no matching events were found."},
+                    {"role": "user", "content": enhanced_input}
+                ],
+                max_tokens=1024,
+                temperature=0.2
+            )
+            return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"Error during LLM prediction: {e}")
-            response = "I encountered an issue trying to process that. Could you try rephrasing?"
-
-        return response
+            print(f"Error during AzureOpenAI prediction: {e}")
+            return "I encountered an issue trying to process that. Could you try rephrasing?"
 
     # ------------------------------------------------------------------
     # Helper: Extract stand numbers
