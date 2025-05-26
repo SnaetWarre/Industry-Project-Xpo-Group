@@ -48,7 +48,6 @@ builder.Services.AddSingleton<CosmosClient>(serviceProvider =>
 
 // Register services
 builder.Services.AddScoped<IEmbeddingService, AzureOpenAIEmbeddingService>();
-builder.Services.AddScoped<ICosmosDbService, CosmosDbService>();
 
 // Add logging
 builder.Services.AddLogging(logging =>
