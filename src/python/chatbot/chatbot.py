@@ -28,7 +28,7 @@ class RateLimiter:
         return True
 
 class EventChatbot:
-    def __init__(self, api_url: str = "http://localhost:5000"):
+    def __init__(self, api_url: str = "http://localhost:5000", container: str = "ffd"):
         load_dotenv()
         self.azure_api_key = os.getenv("AZURE_OPENAI_API_KEY")
         self.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -39,7 +39,8 @@ class EventChatbot:
             base_url=self.azure_endpoint,
             api_key=self.azure_api_key
         )
-        self.vector_client = VectorApiClient(api_url)
+        self.container = container
+        self.vector_client = VectorApiClient(api_url, default_container=container)
         self.rate_limiter = RateLimiter(max_requests=60, time_window=60)  
         
         # Create conversation memory
@@ -222,7 +223,7 @@ class EventChatbot:
         print(f"[DEBUG chat] Updated user_preferences['interests']: {self.user_preferences['interests']}")
 
         # Get relevant events from vector database
-        relevant_events = self.vector_client.search_events(sanitized_input, top_k=5, threshold=0.5)
+        relevant_events = self.vector_client.search_events(sanitized_input, top_k=5, threshold=0.5, container=self.container)
         
         num_events_to_show_in_context = 3 # Limit context to top N events
         
@@ -316,10 +317,11 @@ User's Question: {sanitized_input}"""
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kortrijk Xpo Event Chatbot (local dev mode)")
     parser.add_argument("--api-url", default="http://localhost:5000", help="URL of the Vector Embedding Service API")
+    parser.add_argument("--container", default="ffd", choices=["ffd", "artisan", "abiss"], help="Target CosmosDB container: ffd, artisan, or abiss (default: ffd)")
     args = parser.parse_args()
 
-    chatbot = EventChatbot(api_url=args.api_url)
-    print("Welcome to the Kortrijk Xpo Event Assistant! Type 'quit' to exit.")
+    chatbot = EventChatbot(api_url=args.api_url, container=args.container)
+    print(f"Welcome to the Kortrijk Xpo Event Assistant! (container: {args.container}) Type 'quit' to exit.")
     while True:
         user_input = input("\nYou: ")
         if user_input.lower() == 'quit':

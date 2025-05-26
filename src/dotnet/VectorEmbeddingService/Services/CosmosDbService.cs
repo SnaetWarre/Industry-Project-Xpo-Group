@@ -13,12 +13,10 @@ public class CosmosDbService : ICosmosDbService
     public CosmosDbService(
         CosmosClient cosmosClient,
         IEmbeddingService embeddingService,
-        IConfiguration configuration,
+        string databaseName,
+        string containerName,
         ILogger<CosmosDbService> logger)
     {
-        var databaseName = configuration["CosmosDb:DatabaseName"] ?? throw new ArgumentNullException("CosmosDb:DatabaseName");
-        var containerName = configuration["CosmosDb:ContainerName"] ?? throw new ArgumentNullException("CosmosDb:ContainerName");
-        
         _container = cosmosClient.GetContainer(databaseName, containerName);
         _embeddingService = embeddingService;
         _logger = logger;
