@@ -98,16 +98,10 @@ static async Task InitializeCosmosDbAsync(IServiceProvider services)
     try
     {
         var databaseName = configuration["CosmosDb:DatabaseName"] ?? throw new ArgumentNullException("CosmosDb:DatabaseName");
-        var containerName = configuration["CosmosDb:ContainerName"] ?? throw new ArgumentNullException("CosmosDb:ContainerName");
 
         // Create database if it doesn't exist
         var databaseResponse = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
         logger.LogInformation("Database '{DatabaseName}' ready", databaseName);
-
-        // Create container if it doesn't exist with '/id' as partition key
-        var containerProperties = new ContainerProperties(containerName, "/id");
-        var containerResponse = await databaseResponse.Database.CreateContainerIfNotExistsAsync(containerProperties);
-        logger.LogInformation("Container '{ContainerName}' ready", containerName);
     }
     catch (Exception ex)
     {
