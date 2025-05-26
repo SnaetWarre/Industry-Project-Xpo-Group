@@ -63,3 +63,6 @@ nupkg/
 !artisan_site_data.json
 !abiss_site_data_cleaned.json
 !abiss_site_data.json
+
+# .NET Core appsettings
+src/dotnet/VectorEmbeddingService/appsettings.json
