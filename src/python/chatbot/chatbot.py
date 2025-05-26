@@ -127,13 +127,13 @@ class EventChatbot:
 
         # If no keywords and we are using a specific event file (not the full dump)
         # then assume all content in that file is relevant for a generic query.
-        if not extracted_keywords and self.data_path != "full_site_data.json":
+        if not extracted_keywords and self.data_path != "ffd_site_data_cleaned.json":
             print(f"[DEBUG get_relevant_events] No specific keywords, using all {len(self.events)} items from {self.data_path} as context.")
             return self.events # Return all loaded events for the specific event file
         elif not extracted_keywords:
             print("[DEBUG get_relevant_events] No keywords extracted, cannot find relevant events effectively.")
             # Optionally, return a few generic events or an empty list
-            return self.events[:3] # Return first 3 as a sample if no keywords found
+            return self.events[:5] # Return first 5 as a sample if no keywords found
 
         print(f"[DEBUG get_relevant_events] Searching with keywords: {extracted_keywords}")
         

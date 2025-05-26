@@ -28,25 +28,34 @@ class EventSiteSpiderClean(EventSiteSpider):
         """Called when the feed exporter is closed."""
         self.logger.info("Feed exporter closed signal received")
         
-        # Get the output file from command line arguments
-        output_file = self.crawler.settings.get('FEEDS', {}).get('ffd_site_data.json', {}).get('uri')
+        # Get the output file from settings
+        feeds = self.crawler.settings.get('FEEDS', {})
+        if not feeds:
+            self.logger.error("No output file specified in settings")
+            return
+            
+        # Get the first (and should be only) output file
+        # The FEEDS setting structure is {filename: {settings}}
+        output_file = next(iter(feeds.keys()))
         if not output_file:
-            output_file = 'ffd_site_data.json'  # Default to the command line specified file
+            self.logger.error("No output file found in settings")
+            return
 
         # Create data/processed directory if it doesn't exist
         processed_dir = Path('data/processed')
         processed_dir.mkdir(parents=True, exist_ok=True)
 
-        # Get the original file location (in root directory)
+        # Get the original file location
         original_file = Path(output_file)
         if not original_file.exists():
             self.logger.error(f"Original file not found: {original_file}")
             return
 
-        # Move the file to data/processed
+        # Move the file to data/processed if it's not already there
         target_file = processed_dir / original_file.name
-        shutil.move(str(original_file), str(target_file))
-        self.logger.info(f"Moved file to: {target_file}")
+        if original_file != target_file:
+            shutil.move(str(original_file), str(target_file))
+            self.logger.info(f"Moved file to: {target_file}")
         
         # Wait a moment for the file to be fully written
         time.sleep(1)
