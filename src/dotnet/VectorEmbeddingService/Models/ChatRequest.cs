@@ -1,4 +1,5 @@
 namespace VectorEmbeddingService.Models;
+using System.Text.Json.Serialization;
 
 public class ChatRequest
 {
@@ -6,5 +7,6 @@ public class ChatRequest
     public int? TopK { get; set; }
     public double? Threshold { get; set; }
     // The target event dataset (e.g., 'ffd', 'artisan', 'abiss')
+    [JsonPropertyName("website")]
     public string Website { get; set; } = "ffd";
 } 

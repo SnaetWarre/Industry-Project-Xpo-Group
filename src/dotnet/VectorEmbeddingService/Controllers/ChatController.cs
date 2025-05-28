@@ -89,6 +89,7 @@ public class ChatController : ControllerBase
 
             // Choose the correct Cosmos container based on requested website
             var website = string.IsNullOrWhiteSpace(request.Website) ? "ffd" : request.Website;
+            _logger.LogInformation("Using website container: {Website}", website);
             var databaseName = "XpoData";
             var cosmosLogger = _loggerFactory.CreateLogger<CosmosDbService>();
             var cosmosService = new CosmosDbService(_cosmosClient, _embeddingService, databaseName, website, cosmosLogger);
