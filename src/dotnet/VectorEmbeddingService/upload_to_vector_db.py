@@ -133,8 +133,14 @@ Examples:
     current_count = client.get_event_count()
     print(f"✓ Current database contains {current_count} events in container '{args.container}'")
     
+    # Delete all events from the container
+    print(f"\n3. Deleting all events from container '{args.container}'")
+    if not client.delete_all_events(args.container):
+        print(f"✗ Failed to delete all events from container '{args.container}'")
+        sys.exit(1)
+    
     # Upload data
-    print(f"\n3. Uploading data from {args.json_file} to container '{args.container}'")
+    print(f"\n4. Uploading data from {args.json_file} to container '{args.container}'")
     result = client.upload_scraped_data(args.json_file)
     
     if "error" in result:
