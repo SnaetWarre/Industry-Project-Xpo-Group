@@ -2,6 +2,7 @@ import requests
 import json
 from typing import List, Dict, Optional
 import logging
+import time
 
 class VectorApiClient:
     def __init__(self, base_url: str = "http://localhost:5000", default_container: str = "ffd"):
@@ -104,11 +105,22 @@ class VectorApiClient:
             payload = {"events": events}
             
             self.logger.info(f"Uploading {len(events)} events to vector database in container '{container}'")
-            response = self.session.post(url, json=payload)
-            response.raise_for_status()
+            successful_upserts = 0
+            total_events = len(events)
+            failed_events = []
             
-            result = response.json()
-            self.logger.info(f"Upload completed: {result.get('successfulUpserts', 0)}/{result.get('totalEvents', 0)} successful")
+            for event in events:
+                if self.upload_event_with_retry(event, url):
+                    successful_upserts += 1
+                else:
+                    failed_events.append(event)
+            
+            result = {
+                "successfulUpserts": successful_upserts,
+                "totalEvents": total_events,
+                "failedEvents": failed_events
+            }
+            self.logger.info(f"Upload completed: {successful_upserts}/{total_events} successful")
             return result
             
         except requests.exceptions.RequestException as e:
@@ -117,6 +129,18 @@ class VectorApiClient:
         except Exception as e:
             self.logger.error(f"Unexpected error uploading events: {e}")
             return {"error": str(e)}
+
+    def upload_event_with_retry(self, event, url, max_retries=3, backoff=2):
+        for attempt in range(max_retries):
+            response = requests.post(url, json={"events": [event]})
+            if response.status_code == 200:
+                return True
+            elif response.status_code == 429:
+                retry_after = int(response.headers.get("Retry-After", backoff))
+                time.sleep(retry_after)
+            else:
+                break
+        return False
 
     def get_event_count(self, container: Optional[str] = None) -> int:
         """
@@ -220,4 +244,15 @@ class VectorApiClient:
         except Exception as e:
             error_msg = f"Error uploading scraped data: {e}"
             self.logger.error(error_msg)
-            return {"error": error_msg} 
+            return {"error": error_msg}
+
+    def delete_all_events(self, container: Optional[str] = None) -> bool:
+        container = container or self.default_container
+        try:
+            url = f"{self.base_url}/api/{container}"
+            response = self.session.delete(url)
+            response.raise_for_status()
+            return response.status_code == 204
+        except Exception as e:
+            self.logger.error(f"Error deleting all events: {e}")
+            return False 

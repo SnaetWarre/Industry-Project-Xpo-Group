@@ -101,27 +101,53 @@ def _should_indent() -> bool:
     return _indent_output
 
 
+def extract_artisan_booth_numbers(event):
+    mapping = {}
+    raw = event.get('raw_text_content', '')
+    parts = raw.split("Company City Country Booth", 1)
+    if len(parts) < 2:
+        event['stand_numbers'] = mapping
+        return event
+    section = parts[1]
+    # Regex to capture company (group 1) and booth number (group 2), skipping city and country
+    pattern = re.compile(r'([A-Za-z0-9&%\'\-\.\(\) ]+?)\s+[A-Za-z\(\) \-]+?\s+[A-Z]{2}\s+([0-9A-Za-z;]+)')
+    for m in pattern.finditer(section):
+        company = m.group(1).strip()
+        booth = m.group(2).strip()
+        mapping[company] = booth
+    event['stand_numbers'] = mapping
+    return event
+
+
 def extract_stand_numbers(event):
-    stand_numbers = set()
-    pattern = re.compile(r"(?:stand|booth|stande)[^\d]{0,5}(\d{1,5})", re.IGNORECASE)
-    for key, value in event.items():
-        if isinstance(value, str):
-            for match in pattern.findall(value):
-                stand_numbers.add(match)
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, str):
-                    for match in pattern.findall(item):
-                        stand_numbers.add(match)
-    # Also check for a direct 'stand_numbers' or similar field
-    if 'stand_numbers' in event and isinstance(event['stand_numbers'], list):
-        for n in event['stand_numbers']:
-            stand_numbers.add(str(n))
-    if 'StandNumbers' in event and isinstance(event['StandNumbers'], list):
-        for n in event['StandNumbers']:
-            stand_numbers.add(str(n))
-    # Save as sorted list of strings
-    event['stand_numbers'] = sorted(stand_numbers)
+    # Route to specialized parser for Artisan list of exhibitors
+    if event.get('event_id') == 'artisan' and 'list-of-exhibitors' in event.get('url', ''):
+        return extract_artisan_booth_numbers(event)
+    # Extract mapping of company names to their stand numbers or showroom location for FFD
+    mapping = {}
+    raw = event.get('raw_text_content', '')
+    # Split on 'Read more' but include first chunk to capture the first exhibitor
+    for chunk in raw.split("Read more"):
+        token = chunk.strip()
+        if not token:
+            continue
+        # Booth entries
+        m = re.search(r'([^\n\r]+?)\s+Booth:\s*(\d+)', token)
+        if m:
+            company = m.group(1).strip()
+            # Remove any leading 'View results ' prefix
+            company = re.sub(r'^View results\s+', '', company)
+            number = m.group(2).strip()
+            mapping[company] = number
+            continue
+        # Showroom entries
+        m2 = re.search(r'([^\n\r]+?)\s+Showroom on location', token)
+        if m2:
+            company = m2.group(1).strip()
+            company = re.sub(r'^View results\s+', '', company)
+            mapping[company] = "Showroom on location"
+            continue
+    event['stand_numbers'] = mapping
     return event
 
 

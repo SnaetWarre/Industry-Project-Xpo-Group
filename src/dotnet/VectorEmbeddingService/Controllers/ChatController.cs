@@ -15,7 +15,8 @@ namespace VectorEmbeddingService.Controllers;
 [Route("api/chat")]
 public class ChatController : ControllerBase
 {
-    private readonly ICosmosDbService _cosmosDbService;
+    private readonly CosmosClient _cosmosClient;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly IEmbeddingService _embeddingService;
     private readonly ILogger<ChatController> _logger;
     private readonly OpenAIClient _openAIClient;
@@ -53,7 +54,7 @@ public class ChatController : ControllerBase
     };
 
     // Single, neutral system prompt
-    private const string SystemPrompt = "You are a helpful assistant for Kortrijk Xpo events. Use the provided event information as your main source, but you may use general knowledge and common sense to clarify or explain concepts (such as synonyms or translations, e.g., 'stand' and 'booth' are the same). If no relevant event information is found, let the user know, but still try to be helpful and informative. Respond in the same language as the user's question.";
+    private const string SystemPrompt = "You are a helpful assistant for Kortrijk Xpo events. For booth or stand numbers on Flanders Flooring Days, consult the Participants list at https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/. For Artisan Expo, consult the List of Exhibitors at https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/. Abiss has no exhibitor list. Use the 'standNumbers' field in the event context as your source of booth data. Use provided event information as your primary source; you may use general knowledge sparingly. Respond in the same language as the user's question.";
 
     // Store last LLM answer per IP for follow-up context
     private static readonly ConcurrentDictionary<string, string> _lastLlmAnswer = new();
@@ -65,12 +66,10 @@ public class ChatController : ControllerBase
         ILoggerFactory loggerFactory,
         IConfiguration configuration)
     {
-        var databaseName = "XpoData";
-        var containerName = "ffd"; // Default container
-        var cosmosLogger = loggerFactory.CreateLogger<CosmosDbService>();
-        _cosmosDbService = new CosmosDbService(cosmosClient, embeddingService, databaseName, containerName, cosmosLogger);
+        _cosmosClient = cosmosClient;
         _embeddingService = embeddingService;
         _logger = logger;
+        _loggerFactory = loggerFactory;
 
         // Initialize Azure OpenAI client for chat
         var chatEndpoint = configuration["AzureOpenAIChat:Endpoint"] ?? throw new ArgumentNullException("AzureOpenAIChat:Endpoint");
@@ -88,6 +87,12 @@ public class ChatController : ControllerBase
             if (string.IsNullOrWhiteSpace(request.Query))
                 return BadRequest("Query cannot be empty");
 
+            // Choose the correct Cosmos container based on requested website
+            var website = string.IsNullOrWhiteSpace(request.Website) ? "ffd" : request.Website;
+            var databaseName = "XpoData";
+            var cosmosLogger = _loggerFactory.CreateLogger<CosmosDbService>();
+            var cosmosService = new CosmosDbService(_cosmosClient, _embeddingService, databaseName, website, cosmosLogger);
+
             // Get client IP for rate limiting
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             if (!IsRateLimitAllowed(ipAddress))
@@ -100,7 +105,7 @@ public class ChatController : ControllerBase
 
             // Use the full sanitized user query for embedding/vector search
             var queryEmbedding = await _embeddingService.GetEmbeddingAsync(sanitizedInput);
-            var similarEvents = await _cosmosDbService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
+            var similarEvents = await cosmosService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
 
             // Use keyword extraction only for direct matching (stand/booth/company)
             var keywords = ExtractKeywords(sanitizedInput);

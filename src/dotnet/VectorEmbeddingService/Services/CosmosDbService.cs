@@ -215,4 +215,26 @@ public class CosmosDbService : ICosmosDbService
             throw;
         }
     }
+
+    public async Task DeleteAllEventsAsync()
+    {
+        var query = "SELECT c.id FROM c";
+        var queryDefinition = new QueryDefinition(query);
+        using var feedIterator = _container.GetItemQueryIterator<dynamic>(queryDefinition);
+
+        var ids = new List<string>();
+        while (feedIterator.HasMoreResults)
+        {
+            var response = await feedIterator.ReadNextAsync();
+            foreach (var item in response)
+            {
+                ids.Add(item.id.ToString());
+            }
+        }
+
+        foreach (var id in ids)
+        {
+            await _container.DeleteItemAsync<EventDocument>(id, new PartitionKey(id));
+        }
+    }
 } 

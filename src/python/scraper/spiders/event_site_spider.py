@@ -84,7 +84,7 @@ class EventSiteSpider(scrapy.Spider):
         if booth_match:
             booth_number = booth_match.group(1)
 
-        yield {
+        item = {
             "event_id": self.event_id,
             "url": url,
             "title": title,
@@ -93,6 +93,22 @@ class EventSiteSpider(scrapy.Spider):
             "source_type": "event_site",
             "booth_number": booth_number,
         }
+        # If this is the Artisan list-of-exhibitors page, extract structured exhibitor list
+        if self.event_id == 'artisan' and 'list-of-exhibitors' in url:
+            exhibitors = []
+            for div in response.css('div.exposantenLijst_exposantjs'):
+                name = div.css('div.exposantenLijst_exposantNaam::text').get(default='').strip()
+                city = div.css('div.exposantenLijst_exposantStad::text').get(default='').strip()
+                country = div.css('div.exposantenLijst_exposantLand::text').get(default='').strip()
+                booth = div.css('div.exposantenLijst_exposantPlaats::text').get(default='').strip()
+                exhibitors.append({
+                    'name': name,
+                    'city': city,
+                    'country': country,
+                    'booth': booth,
+                })
+            item['exhibitors'] = exhibitors
+        yield item
 
         # Collect all potential internal links first
         potential_links_to_follow = []

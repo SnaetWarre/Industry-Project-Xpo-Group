@@ -140,4 +140,11 @@ public class FfdController : ControllerBase
             TotalResults = formattedEvents.Count
         });
     }
+
+    [HttpDelete]
+    public async Task<IActionResult> DeleteAllEvents()
+    {
+        await _cosmosDbService.DeleteAllEventsAsync();
+        return NoContent();
+    }
 } 

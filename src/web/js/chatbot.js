@@ -8,23 +8,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const messages = document.getElementById('chatbotMessages');
   const headerTitle = document.querySelector('.chatbot-header-title');
 
-  // Get website ID from container data attribute
+  // Get website ID from selector or fallback to container data attribute
   const chatbotContainer = document.querySelector('.chatbot-container');
-  const websiteId = chatbotContainer.dataset.website;
+  const chatSelector = document.getElementById('chatSelector');
+  let websiteId = chatbotContainer.dataset.website;
+  if (chatSelector) {
+    websiteId = chatSelector.value;
+    chatbotContainer.dataset.website = websiteId;
+    chatSelector.onchange = () => {
+      websiteId = chatSelector.value;
+      chatbotContainer.dataset.website = websiteId;
+      initializeWebsite();
+    };
+  }
 
   // Website specific configurations
   const websiteConfig = {
     abiss: {
       botName: 'AbissBot',
-      welcomeMessage: 'Hoi! Ik ben je beursassistent. Waarin ben je geïnteresseerd? Bijvoorbeeld: chocolade, biologische producten, of iets anders?',
+      welcomeMessage: 'Hoi! Ik ben je digitale beursassistent voor ABISS. Ik kan je helpen met informatie over digitalisering, automatisering, Industry of Things, Intelligence of Things en Security of Things. Waar ben je naar op zoek?',
     },
     ffd: {
       botName: 'FLORBot',
-      welcomeMessage: 'Hoi! Ik ben je beursassistent. Waarin ben je geïnteresseerd? Bijvoorbeeld: chocolade, biologische producten, of iets anders?',
+      welcomeMessage: 'Hoi! Ik ben je beursassistent voor de vloeren- en isolatiebeurs. Ik kan je helpen met informatie over vloeren, isolatie en gerelateerde producten. Waar ben je naar op zoek?',
     },
     artisan: {
       botName: 'ArtisanBot',
-      welcomeMessage: 'Hoi! Ik ben je beursassistent. Waarin ben je geïnteresseerd? Bijvoorbeeld: chocolade, biologische producten, of iets anders?',
+      welcomeMessage: 'Hoi! Ik ben je beursassistent voor artisanale en ambachtelijke producten. Ik kan je helpen met informatie over voedsel, dranken en andere ambachtelijke producten. Waar ben je naar op zoek?',
     },
   };
 
@@ -192,7 +202,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Hide typing indicator before showing response
       hideTypingIndicator();
-      addMessage(data.response);
+      // Determine bot output: prefer LLM 'response', otherwise format event list
+      let botText;
+      if (data.response) {
+        botText = data.response;
+      } else if (data.RelevantEvents) {
+        botText = data.RelevantEvents
+          .map(ev => `• ${ev.Title}${ev.StandNumbers && ev.StandNumbers.length ? ' (Stand: ' + ev.StandNumbers.join(', ') + ')' : ''}`)
+          .join('\n');
+      } else {
+        botText = JSON.stringify(data);
+      }
+      addMessage(botText);
     } catch (error) {
       console.error('Error:', error);
       // Hide typing indicator before showing error
