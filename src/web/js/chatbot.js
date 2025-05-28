@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // API endpoint configuration
-  const API_URL = 'http://localhost:5001';
+  const API_URL = 'http://localhost:5000';
 
   // Initialize website configuration
   function initializeWebsite() {
@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: text,
+          query: text,
           website: websiteId,
         }),
       });

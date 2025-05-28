@@ -101,6 +101,30 @@ def _should_indent() -> bool:
     return _indent_output
 
 
+def extract_stand_numbers(event):
+    stand_numbers = set()
+    pattern = re.compile(r"(?:stand|booth|stande)[^\d]{0,5}(\d{1,5})", re.IGNORECASE)
+    for key, value in event.items():
+        if isinstance(value, str):
+            for match in pattern.findall(value):
+                stand_numbers.add(match)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    for match in pattern.findall(item):
+                        stand_numbers.add(match)
+    # Also check for a direct 'stand_numbers' or similar field
+    if 'stand_numbers' in event and isinstance(event['stand_numbers'], list):
+        for n in event['stand_numbers']:
+            stand_numbers.add(str(n))
+    if 'StandNumbers' in event and isinstance(event['StandNumbers'], list):
+        for n in event['StandNumbers']:
+            stand_numbers.add(str(n))
+    # Save as sorted list of strings
+    event['stand_numbers'] = sorted(stand_numbers)
+    return event
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -151,6 +175,12 @@ def main() -> None:
                 return {k: _remove_non_ascii_only(v) for k, v in obj.items()}
             return obj
         data = _remove_non_ascii_only(data)
+
+    # After loading and (optionally) collapsing/cleaning data, but before dumping to output
+    if isinstance(data, list):
+        data = [extract_stand_numbers(event) for event in data]
+    elif isinstance(data, dict):
+        data = extract_stand_numbers(data)
 
     compact = _dumps(data)
 
