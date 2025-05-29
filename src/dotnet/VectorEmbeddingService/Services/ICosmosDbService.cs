@@ -13,4 +13,5 @@ public interface ICosmosDbService
     Task<bool> DeleteEventAsync(string id);
     Task<int> GetEventCountAsync();
     Task DeleteAllEventsAsync();
+    Task<EventDocument?> GetEventByUrlAsync(string url);
 } 

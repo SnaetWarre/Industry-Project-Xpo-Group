@@ -1,6 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Models;
 using System.Net;
+using System.Linq;
 
 namespace VectorEmbeddingService.Services;
 
@@ -235,6 +236,28 @@ public class CosmosDbService : ICosmosDbService
         foreach (var id in ids)
         {
             await _container.DeleteItemAsync<EventDocument>(id, new PartitionKey(id));
+        }
+    }
+
+    public async Task<EventDocument?> GetEventByUrlAsync(string url)
+    {
+        try
+        {
+            var queryDef = new QueryDefinition("SELECT * FROM c WHERE c.url = @url").WithParameter("@url", url);
+            using var iterator = _container.GetItemQueryIterator<EventDocument>(queryDef);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                var evt = response.FirstOrDefault();
+                if (evt != null)
+                    return evt;
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting event by URL: {Url}", url);
+            throw;
         }
     }
 } 

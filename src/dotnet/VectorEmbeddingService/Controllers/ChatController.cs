@@ -58,6 +58,8 @@ public class ChatController : ControllerBase
 
     // Store last LLM answer per IP for follow-up context
     private static readonly ConcurrentDictionary<string, string> _lastLlmAnswer = new();
+    // Cache for master exhibitor/participant list documents by website
+    private static readonly ConcurrentDictionary<string, EventDocument?> _forcedListCache = new();
 
     public ChatController(
         CosmosClient cosmosClient,
@@ -107,6 +109,25 @@ public class ChatController : ControllerBase
             // Use the full sanitized user query for embedding/vector search
             var queryEmbedding = await _embeddingService.GetEmbeddingAsync(sanitizedInput);
             var similarEvents = await cosmosService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
+
+            // Cache and include the master exhibitor/participant list for Artisan or FFD only
+            EventDocument? forcedEvent = null;
+            if (website == "artisan" || website == "ffd")
+            {
+                if (!_forcedListCache.TryGetValue(website, out forcedEvent))
+                {
+                    var forcedUrl = website == "artisan"
+                        ? "https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/"
+                        : "https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/";
+                    forcedEvent = await cosmosService.GetEventByUrlAsync(forcedUrl);
+                    _forcedListCache[website] = forcedEvent;
+                }
+            }
+            if (forcedEvent != null)
+            {
+                similarEvents.RemoveAll(e => e.Id == forcedEvent.Id);
+                similarEvents.Insert(0, forcedEvent);
+            }
 
             // Use keyword extraction only for direct matching (stand/booth/company)
             var keywords = ExtractKeywords(sanitizedInput);
@@ -301,9 +322,84 @@ public class ChatController : ControllerBase
             .Distinct()
             .ToList();
 
-        // Special handling for 'stand', 'booth', 'booth number', etc.
-        if (input.ToLower().Contains("booth number")) words.Add("stand");
-        if (input.ToLower().Contains("stand number")) words.Add("stand");
+        // Special handling for booth/stand variations in multiple languages
+        var boothStandVariations = new[]
+        {
+            // English
+            "booth number", "stand number", "number booth", "number stand",
+            "booth num", "stand num", "num booth", "num stand",
+            "booth #", "stand #", "# booth", "# stand",
+            "booth nr", "stand nr", "nr booth", "nr stand",
+            "booth", "stand", "boot", "stall",
+            
+            // Dutch
+            "standnummer", "nummer stand", "stand nummer", "nummer stand",
+            "stand #", "# stand", "stand nr", "nr stand",
+            "stand", "kraam", "stall",
+            
+            // French
+            "numéro de stand", "stand numéro", "numéro stand", "stand numéro",
+            "stand #", "# stand", "stand nr", "nr stand",
+            "stand", "kiosque", "stall",
+            
+            // German
+            "standnummer", "nummer stand", "stand nummer", "nummer stand",
+            "stand #", "# stand", "stand nr", "nr stand",
+            "stand", "kiosk", "stall"
+        };
+
+        foreach (var variation in boothStandVariations)
+        {
+            if (input.ToLower().Contains(variation))
+            {
+                words.Add("stand");
+                break;
+            }
+        }
+
+        // Add event-specific keywords based on the data structure in multiple languages
+        var exhibitorKeywords = new[]
+        {
+            // English
+            "exhibitor", "participant", "company", "brand",
+            // Dutch
+            "exposant", "deelnemer", "bedrijf", "merk",
+            // French
+            "exposant", "participant", "entreprise", "marque",
+            // German
+            "aussteller", "teilnehmer", "unternehmen", "marke"
+        };
+
+        foreach (var keyword in exhibitorKeywords)
+        {
+            if (input.ToLower().Contains(keyword))
+            {
+                words.Add("exhibitor");
+                break;
+            }
+        }
+
+        var locationKeywords = new[]
+        {
+            // English
+            "city", "location", "country",
+            // Dutch
+            "stad", "locatie", "land",
+            // French
+            "ville", "lieu", "pays",
+            // German
+            "stadt", "ort", "land"
+        };
+
+        foreach (var keyword in locationKeywords)
+        {
+            if (input.ToLower().Contains(keyword))
+            {
+                words.Add("location");
+                break;
+            }
+        }
+
         return words;
     }
 
@@ -313,7 +409,7 @@ public class ChatController : ControllerBase
             return "No specific events found matching your query in the available data.";
 
         var contextParts = new List<string>();
-        var numEventsToShow = Math.Min(3, events.Count);
+        var numEventsToShow = Math.Min(5, events.Count);
 
         for (int i = 0; i < numEventsToShow; i++)
         {
