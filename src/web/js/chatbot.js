@@ -227,4 +227,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize the website configuration
   initializeWebsite();
+
+  // Initialize resize handles for chat window
+  (function initResizers() {
+    const handles = ['left', 'top', 'top-left'];
+    handles.forEach(dir => {
+      const handle = document.createElement('div');
+      handle.className = `resize-handle ${dir}`;
+      windowEl.appendChild(handle);
+      handle.addEventListener('mousedown', e => startResize(e, dir));
+    });
+
+    function startResize(e, dir) {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startWidth = windowEl.offsetWidth;
+      const startHeight = windowEl.offsetHeight;
+
+      function doResize(ev) {
+        if (dir === 'left' || dir === 'top-left') {
+          const dx = ev.clientX - startX;
+          windowEl.style.width = (startWidth - dx) + 'px';
+        }
+        if (dir === 'top' || dir === 'top-left') {
+          const dy = ev.clientY - startY;
+          windowEl.style.height = (startHeight - dy) + 'px';
+        }
+      }
+
+      function stopResize() {
+        document.removeEventListener('mousemove', doResize);
+        document.removeEventListener('mouseup', stopResize);
+      }
+
+      document.addEventListener('mousemove', doResize);
+      document.addEventListener('mouseup', stopResize);
+    }
+  })();
 });

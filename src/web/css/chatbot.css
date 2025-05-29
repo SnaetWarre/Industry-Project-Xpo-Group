@@ -360,4 +360,32 @@
 
 .chatbot-container[data-website="artisan"] .typing-indicator img {
     filter: brightness(0) saturate(100%) invert(23%) sepia(0%) saturate(0%) hue-rotate(241deg) brightness(98%) contrast(84%);
+}
+
+/* Resize handles inside chatbot window */
+.chatbot-window .resize-handle {
+    position: absolute;
+    z-index: 1001;
+    background: transparent;
+}
+.chatbot-window .resize-handle.left {
+    top: 10px;
+    bottom: 10px;
+    left: 0;
+    width: 10px;
+    cursor: ew-resize;
+}
+.chatbot-window .resize-handle.top {
+    left: 10px;
+    right: 10px;
+    top: 0;
+    height: 10px;
+    cursor: ns-resize;
+}
+.chatbot-window .resize-handle.top-left {
+    top: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    cursor: nwse-resize;
 } 
