@@ -105,10 +105,11 @@ python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/f
 ---
 
 ## Main Components
-- **src/python/chatbot/**: LangChain-based chatbot, connects to vector API
 - **src/python/scraper/**: Scrapy spiders for event data
 - **src/dotnet/VectorEmbeddingService/**: .NET WebAPI for embedding, search, and DB
 - **data/processed/**: Cleaned event data JSONs
+- **web/**: Frontend in Vanilla JS
+
 
 ---
 
