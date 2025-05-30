@@ -54,7 +54,43 @@ public class ChatController : ControllerBase
     };
 
     // Single, neutral system prompt
-    private const string SystemPrompt = "You are a helpful assistant for Kortrijk Xpo events. For booth or stand numbers on Flanders Flooring Days, consult the Participants list at https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/. For Artisan Expo, consult the List of Exhibitors at https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/. Abiss has no exhibitor list. Use the 'standNumbers' field in the event context as your source of booth data. Use provided event information as your primary source; you may use general knowledge sparingly. Respond in the same language as the user's question.";
+    private const string SystemPromptFFD = @"
+        You are the specialized assistant for Flanders Flooring Days (FFD). 
+        Only answer questions about Flanders Flooring Days. 
+        If asked about anything else, politely decline and redirect to Flanders Flooring Days topics only.
+
+        For booth/stand information:
+        - Flanders Flooring Days: https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/
+        - Use the 'standNumbers' field in the event context as your source of booth data.
+
+        Use provided event information as your primary source.
+        Respond in the same language as the user's question.";
+
+    private const string SystemPromptArtisan = @"
+        You are the specialized assistant for Artisan. 
+        Only answer questions about Artisan. 
+        If asked about anything else, politely decline and redirect to Artisan topics only.
+
+        For booth/stand information:
+        - Artisan Expo: https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/
+        - Use the 'standNumbers' field in the event context as your source of booth data.
+
+        Use provided event information as your primary source.
+        Respond in the same language as the user's question.";
+
+    private const string SystemPromptAbiss = @"
+        You are the specialized assistant for Abiss. 
+        Only answer questions about Abiss. 
+        If asked about anything else, politely decline and redirect to Abiss topics only.
+
+        For booth/stand information:
+        - Abiss has no exhibitor list.
+        - Use the 'standNumbers' field in the event context as your source of booth data.
+
+        Use provided event information as your primary source.
+        Respond in the same language as the user's question.";
+
+    
 
     // Store last LLM answer per IP for follow-up context
     private static readonly ConcurrentDictionary<string, string> _lastLlmAnswer = new();
@@ -247,13 +283,22 @@ public class ChatController : ControllerBase
             // Construct the enhanced input for the LLM
             var enhancedInput = $"{lastLlmContext}Relevant Event Information:\n{eventsContext}\n\n---\n\nUser's Question: {sanitizedInput}";
 
+            // Select the system prompt based on the website
+            string systemPrompt = website switch
+            {
+                "ffd" => SystemPromptFFD,
+                "abiss" => SystemPromptAbiss,
+                "artisan" => SystemPromptArtisan,
+                _ => SystemPromptFFD // fallback
+            };
+
             // Get response from Azure OpenAI
             var chatCompletionsOptions = new ChatCompletionsOptions
             {
                 DeploymentName = _deploymentName,
                 Messages =
                 {
-                    new ChatRequestSystemMessage(SystemPrompt),
+                    new ChatRequestSystemMessage(systemPrompt),
                     new ChatRequestUserMessage(enhancedInput)
                 },
                 MaxTokens = 2048,

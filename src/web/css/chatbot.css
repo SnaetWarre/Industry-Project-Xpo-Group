@@ -388,4 +388,37 @@
     width: 10px;
     height: 10px;
     cursor: nwse-resize;
+}
+
+.chatbot-disclaimer {
+    padding: 0.5em 2em 0.5em 0.5em;
+    font-size: 0.8em;
+    color: #666;
+    position: relative;
+    background: #f8f8f8;
+    border-top: 1px solid #eee;
+}
+
+.chatbot-disclaimer-close {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+    border-radius: 50%;
+}
+
+.chatbot-disclaimer-close:hover {
+    background: #eee;
+    color: #333;
+}
+
+.chatbot-disclaimer.hidden {
+    display: none;
 } 

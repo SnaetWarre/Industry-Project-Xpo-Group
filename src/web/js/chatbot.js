@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('chatbotInput');
   const messages = document.getElementById('chatbotMessages');
   const headerTitle = document.querySelector('.chatbot-header-title');
+  const disclaimer = document.getElementById('chatbotDisclaimer');
+  const disclaimerClose = document.getElementById('disclaimerClose');
 
   // Get website ID from selector or fallback to container data attribute
   const chatbotContainer = document.querySelector('.chatbot-container');
@@ -223,6 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     input.disabled = false;
     input.focus();
+  };
+
+  // Handle disclaimer close button
+  disclaimerClose.onclick = () => {
+    disclaimer.classList.add('hidden');
   };
 
   // Initialize the website configuration

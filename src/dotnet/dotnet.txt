@@ -1,1 +1,0 @@
-put everything dotnet related in this folder hehe, toch iets van somewhat structure
