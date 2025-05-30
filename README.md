@@ -1,7 +1,8 @@
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
+
 # Event Chatbot & Vector Embedding Service
 
 This project provides a full-stack solution for event Q&A using Retrieval-Augmented Generation (RAG):
-- **Python-based chatbot** (LangChain + Ollama) for natural language interaction
 - **.NET-based vector embedding service** (Azure OpenAI + CosmosDB) for semantic search and storage
 - **Scrapy-based web scraper** for ingesting event data
 
@@ -50,9 +51,7 @@ This project provides a full-stack solution for event Q&A using Retrieval-Augmen
     │       ├── vector_api_client.py
     │       └── VectorEmbeddingService.csproj
     └── python
-        ├── chatbot
-        │   ├── chatbot.py
-        │   └── vector_api_client.py
+        │   
         ├── scraper
         │   ├── items.py
         │   ├── middlewares.py
