@@ -12,55 +12,69 @@ This project provides a full-stack solution for event Q&A using Retrieval-Augmen
 
 ```
 .
+├── CHANGELOG.md
 ├── data
-│   └── processed
-│       ├── abiss_site_data_cleaned.json
-│       ├── abiss_site_data.json
-│       ├── artisan_site_data_cleaned.json
-│       ├── artisan_site_data.json
-│       ├── ffd_site_data_cleaned.json
-│       └── ffd_site_data.json
+│   └── processed
+│       ├── abiss_site_data_cleaned.json
+│       ├── abiss_site_data.json
+│       ├── artisan_site_data_cleaned.json
+│       ├── artisan_site_data.json
+│       ├── ffd_site_data_cleaned.json
+│       └── ffd_site_data.json
 ├── docs
-│   └── overview.html
-├── .gitignore
+│   └── overview.html
 ├── Industry-Project-Xpo-Group.sln
 ├── plan.md
-├── project_tree.txt
 ├── README.md
 ├── requirements.txt
 ├── scrapy.cfg
 └── src
     ├── dotnet
-    │   ├── dotnet.txt
-    │   └── VectorEmbeddingService
-    │       ├── appsettings.example.json
-    │       ├── appsettings.json
-    │       ├── Controllers
-    │       │   └── EventsController.cs
-    │       ├── Models
-    │       │   ├── ChatRequest.cs
-    │       │   ├── EventDocument.cs
-    │       │   └── SearchRequest.cs
-    │       ├── Program.cs
-    │       ├── Services
-    │       │   ├── AzureOpenAIEmbeddingService.cs
-    │       │   ├── CosmosDbService.cs
-    │       │   ├── ICosmosDbService.cs
-    │       │   └── IEmbeddingService.cs
-    │       ├── upload_to_vector_db.py
-    │       ├── vector_api_client.py
-    │       └── VectorEmbeddingService.csproj
-    └── python
-        │   
-        ├── scraper
-        │   ├── items.py
-        │   ├── middlewares.py
-        │   ├── settings.py
-        │   └── spiders
-        │       ├── event_site_spider_clean.py
-        │       └── event_site_spider.py
-        └── utils
-            └── clean_json.py
+    │   └── VectorEmbeddingService
+    │       ├── appsettings.example.json
+    │       ├── appsettings.json
+    │       ├── Controllers
+    │       │   ├── AbissController.cs
+    │       │   ├── ArtisanController.cs
+    │       │   ├── ChatController.cs
+    │       │   └── FfdController.cs
+    │       ├── data
+    │       ├── Models
+    │       │   ├── ChatRequest.cs
+    │       │   ├── EventDocument.cs
+    │       │   └── SearchRequest.cs
+    │       ├── Program.cs
+    │       ├── Services
+    │       │   ├── AzureOpenAIEmbeddingService.cs
+    │       │   ├── CosmosDbService.cs
+    │       │   ├── ICosmosDbService.cs
+    │       │   └── IEmbeddingService.cs
+    │       ├── upload_to_vector_db.py
+    │       ├── vector_api_client.py
+    │       └── VectorEmbeddingService.csproj
+    ├── python
+    │   ├── scraper
+    │   │   ├── items.py
+    │   │   ├── middlewares.py
+    │   │   ├── settings.py
+    │   │   └── spiders
+    │   │       ├── event_site_spider_clean.py
+    │   │       └── event_site_spider.py
+    │   └── utils
+    │       └── clean_json.py
+    └── web
+        ├── css
+        │   └── chatbot.css
+        ├── images
+        │   └── robot.svg
+        ├── importready
+        │   ├── abiss-bot.js
+        │   ├── artisan-bot.js
+        │   ├── ffd-bot.js
+        │   └── importtest.html
+        ├── index.html
+        └── js
+            └── chatbot.js
 ```
 
 ---
