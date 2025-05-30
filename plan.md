@@ -1,106 +1,108 @@
 # AI Chatbot Integration Plan for Kortrijk Xpo & Event Microsites
 
-**Document version:** 2025-05-21  
+**Document version:** 2025-05-29  
 **Authors:** MCT Industry Project Student Group (Howest)  
-**Scope:** Flanders Flooring Days, Artisan-Xpo, Abiss Summit & future Xpo-hosted event sites
+**Scope:** Flanders Flooring Days (FFD), Artisan-Xpo, Abiss Summit
 
 ---
 
 ## 1. Objectives
-1. Offer visitors an on-page virtual assistant that answers practical and in-depth questions about each event (dates, tickets, programme, venue logistics, etc.).
-2. Reduce pressure on support teams by deflecting repetitive questions.
-3. Re-use our existing RAG-based Python codebase, but expose it as a web service and embed it across multiple sites with minimal effort.
+1. On-site virtual assistant answering practical and in-depth event questions.  
+2. Deflect repetitive support requests via data-driven retrieval.  
+3. Leverage Python scraper and .NET VectorEmbeddingService (C#) with Azure OpenAI & Cosmos DB, plus a lightweight web widget.
 
 ---
 
 ## 2. High-level roadmap
 | Phase | Target week | Deliverables |
-|-------|-------------|--------------|
-| 0 | _now_ | Finalise this plan, assign owners, create GitHub project board |
-| 1 | +1 wk | Extend Scrapy spider(s) to crawl Flanders Flooring Days, Artisan-Xpo, Abiss Summit (primary domain only, depth ≤ 1) |
-| 2 | +2 wk | Refactor existing RAG logic into reusable **`chat_service/`** (FastAPI) with `/chat` endpoint |
-| 3 | +3 wk | Introduce vector search (ChromaDB/FAISS) & embeddings (sentence-transformers) for better retrieval |
-| 4 | +4 wk | Build lightweight JS widget (floating button ➜ chat panel) + hand-off style variables (colour, logo) |
-| 5 | +5 wk | Pilot on staging sub-domains of the three event sites |
-| 6 | +6 wk | Measure, iterate (logging, analytics, fallback answers), prepare production roll-out |
-
-_Parallel tracks_: security/GDPR review, CI/CD & Docker setup, stakeholder demos every sprint.
+|---|---|---|
+| 0  | _now_   | Finalise revised architecture, assign owners, update GitHub board |
+| 1  | +1 wk   | Python Scrapy spider enhancements for multi-domain crawl & JSON export |
+| 2  | +2 wk   | Vector ingestion pipeline: `upload_to_vector_db.py` integration & bulk-upload endpoints |
+| 3  | +3 wk   | C# embedding service refactoring: AzureOpenAIEmbeddingService & CosmosDbService |
+| 4  | +4 wk   | Chat API (ASP.NET Core) improvements: rate limiting, sanitization & direct-match logic |
+| 5  | +5 wk   | Front-end JS widget enhancements: dynamic config, typing indicators, error handling |
+| 6  | +6 wk   | Pilot on staging: analytics, logging, privacy review, performance tuning |
+_Parallel_: CI/CD, Docker Compose, stakeholder demos, GDPR audit.
 
 ---
 
 ## 3. Architecture
+```text
+Browser (JS Widget) → ASP.NET Core Chat API → Cosmos DB (vector store & metadata) ↔ Azure OpenAI
 ```
-Browser          ┌──────────────┐    REST      ┌───────────────┐   Local          ┌──────────┐
- Chat widget  ⇄  │  FastAPI     │ ⇄  /chat  ⇄  │  RAG Service  │ ⇄  embeddings ⇄  │ Ollama │
-(on event site)   │  (Nginx)     │              │  (Python)     │    (Chroma)      │ Llama3 │
-                 └──────────────┘              └───────────────┘                  └──────────┘
-```
-Key points:
-1. **Widget**: one minified JS file loaded via `<script src="https://xpo.ai/chat.js" data-event="ffd">` that injects a floating icon. On open, it POSTs user text + `event_id` & (optionally) current page URL to `/chat`.
-2. **FastAPI gateway**: lightweight layer providing CORS, rate-limiting & authentication (public sites ➜ use reCAPTCHA v3 + per-origin API keys).
-3. **RAG Service**: wraps existing `chatbot.py` logic, but replaces JSON scan with vector search. Accepts `event_id` to scope retrieval.
-4. **Embeddings store**: Chroma or FAISS, one collection per event; populated by scraper pipeline.
-5. **LLM**: continue with Ollama (Llama 3) running on same server or GPU node.
+1. **JS Widget** (`src/web/js/chatbot.js`): Vanilla JS + Shadow DOM; fetches `/api/chat`, displays messages, handles multi-language configs.
+2. **Chat API** (`ChatController.cs`): ASP.NET Core endpoint `/api/chat`, implements
+   - CORS, JSON parsing, rate limiting (60 req/min per IP)  
+   - Input sanitization & stop-word removal  
+   - Query embedding via **AzureOpenAIEmbeddingService**  
+   - Vector search in Cosmos DB via **CosmosDbService**  
+   - Direct-match logic (stand/booth lookup, synonyms)  
+   - Conversational memory (in-memory per IP)  
+   - Azure OpenAI chat completion with system prompt and contextual events
+3. **Embedding & Vector Store**:
+   - **AzureOpenAIEmbeddingService**: generates embeddings for ingestion and queries  
+   - **CosmosDbService**: upserts event docs with embeddings; supports similarity search
+4. **LLM**: Azure OpenAI (`ChatCompletions`) with configurable deployment; fallback to alternative model via configuration
 
 ---
 
 ## 4. Data ingestion pipeline
-1. **Spider layout**
-   * `kortrijk_xpo/spiders/event_site_spider.py` → generic; takes `start_urls` list.
-   * Domain rules & CSS selectors for each site in `spider_config.yaml`.
-2. **Output format**
-   ```json
-   {
-     "event_id": "ffd",
-     "url": "https://www.flandersflooringdays.com/en/plan-your-visit/",
-     "title": "Plan your visit – Practical information",
-     "text": "…cleaned visible text…"
-   }
-   ```
-3. **Post-processing**
-   * Remove navigation/footer noise with readability-lxml.
-   * Split into 1-3 kB chunks with overlap; generate embeddings via `sentence-transformers/all-MiniLM-L6-v2`.
-   * Upsert into Chroma (`collection_name = event_id`).
-4. **Incremental updates**: run daily GitHub Action; spider uses `ETag`/`Last-Modified` headers to skip unchanged pages.
+1. **Scraping**: `src/python/scraper/spiders/event_site_spider.py` → JSON file with (`event_id`, `url`, `title`, `description`, `raw_text_content`, `booth_number`).
+2. **Cleaning**: Optional `clean_json.py` to minify and normalize whitespace, remove non-ASCII.
+3. **Bulk upload**: `upload_to_vector_db.py` (in `VectorEmbeddingService`) calls `/api/{container}/bulk-upload` to clear and upsert events.
+4. **Embedding generation**: AzureOpenAIEmbeddingService produces embeddings; CosmosDbService persists vectors + metadata.
+5. **Incremental updates**: run scraper + upload daily via GitHub Actions; use HTTP headers (ETag/Last-Modified) to skip unchanged pages.
 
 ---
 
 ## 5. Chat logic enhancements
-1. **Hybrid retrieval**: keyword filter (current code) + top-k embedding similarity.
-2. **Context window handling**: auto-summarise long snippets to stay ≤ 8 k tokens.
-3. **Page-aware biasing**: if current page URL is provided, boost documents from same URL path.
-4. **Temperature scheduling**: lower when answerable, higher when fallback ("I don't have that info").
-5. **Logging**: store anonymised conversation, retrieval meta & response latency in Postgres for analytics.
+1. **Hybrid retrieval**: vector search (Azure Cosmos) + direct keyword matching (booth/stand).  
+2. **Context handling**: in-memory conversational memory & follow-up detection.  
+3. **Sanitization**: remove stop-words, detect and normalize synonyms.  
+4. **Rate limiting & logging**: per-IP limits, anonymized logs for analytics.  
+5. **Fallback answers**: system prompt guidance + user feedback loop (thumbs up/down).
 
 ---
 
 ## 6. Front-end widget details
-* **Tech:** Vanilla JS + shadow DOM, no framework to keep bundle < 30 kB gzipped.
-* **Features:**
-  * Quick replies (chips) for top FAQ; updated via `/faq?event_id=` endpoint.
-  * "Email me this answer" CTA (calls SendGrid backend).
-  * Brandable via CSS variables `--chat-primary`, `--chat-font`.
-* **Accessibility:** ARIA roles, focus trap, keyboard navigation.
-* **i18n:** auto-detect site language (`html[lang]`) ➜ pass to backend for prompt language.
+- **Tech**: Vanilla JS, Shadow DOM; bundle <30 KB gzipped.  
+- **Config**: `data-website` attribute + optional selector for event (`ffd`, `artisan`, `abiss`).  
+- **UX**: typing indicator, configurable welcome messages, error states.  
+- **Branding**: CSS variables `--chat-primary`, `--chat-font`.  
+- **i18n & accessibility**: detects `html[lang]`, ARIA roles, keyboard navigation.
 
 ---
 
 ## 7. Deployment & DevOps
-* **Docker Compose** stacks:
-  * `gateway` (uvicorn-gunicorn-fastapi)
-  * `rag_service` (python)
-  * `ollama` (official image)
-  * `chromadb`
-* **Environments**: `dev` (localhost), `staging` (Azure VM), `prod` (KXpo on-prem or AWS).
-* **CI/CD**: GitHub Actions — lint, tests, image build, deploy through SSH or Azure Web Apps.
-* **Observability**: Prometheus exporter for FastAPI; Grafana dashboard.
+- **Docker Compose**:
+  - `chat-api` (ASP.NET Core)  
+  - `scraper` (Python)  
+  - `vector-ingestion` (Python)  
+  - `cosmosdb-emulator` (dev) or Azure Cosmos
+- **CI/CD**: GitHub Actions for lint, tests, builds, deploy to Azure (API) & static hosting.  
+- **Observability**: Application Insights for .NET, Prometheus + Grafana for metrics.
 
 ---
 
 ## 8. Privacy & Compliance
-* Only store minimal, anonymised chat logs; mask personal data via regex patterns.
-* Show cookie-consent banner update to include chatbot (functional cookies).
-* Provide "Erase my data" endpoint.
+- Mask personal data via sanitization regex.  
+- Consent banner updates for functional cookies.  
+- "Erase my data" endpoint support.
+
+---
+
+## 9. Essential Guidance & Must-Haves
+* Comprehensive Coverage: ensure the scraper and ingestion pipeline include all event content (agenda, speakers, exhibitors, sponsors, logistics) with automated freshness checks and change detection.
+* High-Quality Data: apply noise removal, text normalization, metadata tagging (category, date, location) and maintain a curated FAQ knowledge base for top user intents.
+* Performance & Scalability: target <200 ms average response time, implement semantic and HTTP caching, and conduct load testing to support >500 concurrent users.
+* UX & Accessibility: adopt mobile-first design, WCAG 2.1 AA compliance, keyboard navigation, ARIA roles, theme customization, and localized date/time formats.
+* Security & Privacy: integrate anti-bot measures using free Cloudflare Turnstile (or Google reCAPTCHA v3) in the JS widget, with server-side token verification; optionally issue short-lived JWTs for session authentication (issued transparently by the gateway); enforce strict CORS policies, input sanitization to prevent XSS/SQLi, GDPR-compliant data handling, and regular security audits.
+* Monitoring & Analytics: track query volumes, top intents, fallback rates, and user feedback (thumbs up/down), and expose dashboards via Grafana or Application Insights.
+* Continuous Improvement: establish an active learning loop for retraining embeddings and re-ranking models, A/B test prompt templates and retrieval strategies, and maintain versioned vector data.
+* Multi-language Support: detect page language, support multilingual embeddings or dynamic translation, and maintain separate context collections per language.
+* Human Escalation & Fallback: detect low-confidence responses, provide a "contact support" CTA or live chat escalation, and integrate with ticketing systems.
+* Documentation & Testing: maintain clear API and ingestion docs, write integration and end-to-end tests covering scraper → ingestion → API → widget.
 
 ---
 

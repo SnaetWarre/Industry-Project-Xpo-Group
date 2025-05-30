@@ -91,6 +91,13 @@ Examples:
         help='Enable verbose logging'
     )
     
+    parser.add_argument(
+        '--container',
+        default='ffd',
+        choices=['ffd', 'artisan', 'abiss'],
+        help='Target CosmosDB container: ffd, artisan, or abiss (default: ffd)'
+    )
+    
     args = parser.parse_args()
     
     # Setup logging
@@ -111,23 +118,29 @@ Examples:
         sys.exit(0)
     
     # Initialize API client
-    print(f"\n2. Connecting to Vector API: {args.api_url}")
-    client = VectorApiClient(args.api_url)
+    print(f"\n2. Connecting to Vector API: {args.api_url} (container: {args.container})")
+    client = VectorApiClient(args.api_url, default_container=args.container)
     
     # Check service health
     if not client.health_check():
-        print(f"✗ Cannot connect to Vector API at {args.api_url}")
+        print(f"✗ Cannot connect to Vector API at {args.api_url} (container: {args.container})")
         print("Make sure the C# Vector Embedding Service is running")
         sys.exit(1)
     
-    print("✓ Vector API service is available")
+    print(f"✓ Vector API service is available for container '{args.container}'")
     
     # Get current database stats
     current_count = client.get_event_count()
-    print(f"✓ Current database contains {current_count} events")
+    print(f"✓ Current database contains {current_count} events in container '{args.container}'")
+    
+    # Delete all events from the container
+    print(f"\n3. Deleting all events from container '{args.container}'")
+    if not client.delete_all_events(args.container):
+        print(f"✗ Failed to delete all events from container '{args.container}'")
+        sys.exit(1)
     
     # Upload data
-    print(f"\n3. Uploading data from {args.json_file}")
+    print(f"\n4. Uploading data from {args.json_file} to container '{args.container}'")
     result = client.upload_scraped_data(args.json_file)
     
     if "error" in result:
@@ -149,7 +162,7 @@ Examples:
     # Final database stats
     final_count = client.get_event_count()
     new_events = final_count - current_count
-    print(f"\nDatabase now contains {final_count} events (+{new_events} new)")
+    print(f"\nDatabase now contains {final_count} events (+{new_events} new) in container '{args.container}'")
     
     print("\n✓ You can now use the vector chatbot to search these events!")
 

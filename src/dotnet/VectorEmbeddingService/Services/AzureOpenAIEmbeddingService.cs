@@ -13,9 +13,9 @@ public class AzureOpenAIEmbeddingService : IEmbeddingService
         IConfiguration configuration,
         ILogger<AzureOpenAIEmbeddingService> logger)
     {
-        var endpoint = configuration["AzureOpenAI:Endpoint"] ?? throw new ArgumentNullException("AzureOpenAI:Endpoint");
-        var apiKey = configuration["AzureOpenAI:ApiKey"] ?? throw new ArgumentNullException("AzureOpenAI:ApiKey");
-        _deploymentName = configuration["AzureOpenAI:EmbeddingDeploymentName"] ?? throw new ArgumentNullException("AzureOpenAI:EmbeddingDeploymentName");
+        var endpoint = configuration["AzureOpenAIEmbedding:Endpoint"] ?? throw new ArgumentNullException("AzureOpenAIEmbedding:Endpoint");
+        var apiKey = configuration["AzureOpenAIEmbedding:ApiKey"] ?? throw new ArgumentNullException("AzureOpenAIEmbedding:ApiKey");
+        _deploymentName = configuration["AzureOpenAIEmbedding:EmbeddingDeploymentName"] ?? throw new ArgumentNullException("AzureOpenAIEmbedding:EmbeddingDeploymentName");
         
         _openAIClient = new OpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey));
         _logger = logger;

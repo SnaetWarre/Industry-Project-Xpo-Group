@@ -2,6 +2,7 @@ using VectorEmbeddingService.Models;
 
 namespace VectorEmbeddingService.Services;
 
+// This interface is implemented by CosmosDbService, which is now container-specific (ffd, artisan, abiss).
 public interface ICosmosDbService
 {
     Task<string> UpsertEventAsync(EventDocument eventDocument);
@@ -11,4 +12,6 @@ public interface ICosmosDbService
     Task<List<EventDocument>> GetAllEventsAsync();
     Task<bool> DeleteEventAsync(string id);
     Task<int> GetEventCountAsync();
+    Task DeleteAllEventsAsync();
+    Task<EventDocument?> GetEventByUrlAsync(string url);
 } 

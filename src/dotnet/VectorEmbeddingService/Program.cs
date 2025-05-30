@@ -11,11 +11,17 @@ builder.Services.AddSwaggerGen();
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowPythonChatbot", policy =>
+    options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        policy.WithOrigins(
+            "https://www.abissummit.be",
+            "https://www.artisan-xpo.be",
+            "https://www.flandersflooringdays.com",
+            "http://localhost:5500",
+            "http://127.0.0.1:5500"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader();
     });
 });
 
@@ -40,7 +46,6 @@ builder.Services.AddSingleton<CosmosClient>(serviceProvider =>
 
 // Register services
 builder.Services.AddScoped<IEmbeddingService, AzureOpenAIEmbeddingService>();
-builder.Services.AddScoped<ICosmosDbService, CosmosDbService>();
 
 // Add logging
 builder.Services.AddLogging(logging =>
@@ -51,7 +56,9 @@ builder.Services.AddLogging(logging =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Add CORS before anything else that handles requests!
+app.UseCors("AllowSpecificOrigins");
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -59,7 +66,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowPythonChatbot");
 app.UseAuthorization();
 app.MapControllers();
 
@@ -78,16 +84,10 @@ static async Task InitializeCosmosDbAsync(IServiceProvider services)
     try
     {
         var databaseName = configuration["CosmosDb:DatabaseName"] ?? throw new ArgumentNullException("CosmosDb:DatabaseName");
-        var containerName = configuration["CosmosDb:ContainerName"] ?? throw new ArgumentNullException("CosmosDb:ContainerName");
 
         // Create database if it doesn't exist
         var databaseResponse = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
         logger.LogInformation("Database '{DatabaseName}' ready", databaseName);
-
-        // Create container if it doesn't exist with '/id' as partition key
-        var containerProperties = new ContainerProperties(containerName, "/id");
-        var containerResponse = await databaseResponse.Database.CreateContainerIfNotExistsAsync(containerProperties);
-        logger.LogInformation("Container '{ContainerName}' ready", containerName);
     }
     catch (Exception ex)
     {

@@ -1,6 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Models;
 using System.Net;
+using System.Linq;
 
 namespace VectorEmbeddingService.Services;
 
@@ -13,12 +14,10 @@ public class CosmosDbService : ICosmosDbService
     public CosmosDbService(
         CosmosClient cosmosClient,
         IEmbeddingService embeddingService,
-        IConfiguration configuration,
+        string databaseName,
+        string containerName,
         ILogger<CosmosDbService> logger)
     {
-        var databaseName = configuration["CosmosDb:DatabaseName"] ?? throw new ArgumentNullException("CosmosDb:DatabaseName");
-        var containerName = configuration["CosmosDb:ContainerName"] ?? throw new ArgumentNullException("CosmosDb:ContainerName");
-        
         _container = cosmosClient.GetContainer(databaseName, containerName);
         _embeddingService = embeddingService;
         _logger = logger;
@@ -214,6 +213,50 @@ public class CosmosDbService : ICosmosDbService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting event count");
+            throw;
+        }
+    }
+
+    public async Task DeleteAllEventsAsync()
+    {
+        var query = "SELECT c.id FROM c";
+        var queryDefinition = new QueryDefinition(query);
+        using var feedIterator = _container.GetItemQueryIterator<dynamic>(queryDefinition);
+
+        var ids = new List<string>();
+        while (feedIterator.HasMoreResults)
+        {
+            var response = await feedIterator.ReadNextAsync();
+            foreach (var item in response)
+            {
+                ids.Add(item.id.ToString());
+            }
+        }
+
+        foreach (var id in ids)
+        {
+            await _container.DeleteItemAsync<EventDocument>(id, new PartitionKey(id));
+        }
+    }
+
+    public async Task<EventDocument?> GetEventByUrlAsync(string url)
+    {
+        try
+        {
+            var queryDef = new QueryDefinition("SELECT * FROM c WHERE c.url = @url").WithParameter("@url", url);
+            using var iterator = _container.GetItemQueryIterator<EventDocument>(queryDef);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                var evt = response.FirstOrDefault();
+                if (evt != null)
+                    return evt;
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting event by URL: {Url}", url);
             throw;
         }
     }
