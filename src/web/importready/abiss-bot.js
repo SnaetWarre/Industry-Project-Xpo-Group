@@ -1,6 +1,4 @@
-// Import markdown-it for markdown support
-import MarkdownIt from 'markdown-it';
-const md = new MarkdownIt();
+
 
 // Create and inject the chatbot HTML structure
 function createChatbotStructure() {
