@@ -69,29 +69,4 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
-// Initialize CosmosDB database and container if they don't exist
-await InitializeCosmosDbAsync(app.Services);
-
 app.Run();
-
-static async Task InitializeCosmosDbAsync(IServiceProvider services)
-{
-    using var scope = services.CreateScope();
-    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var cosmosClient = scope.ServiceProvider.GetRequiredService<CosmosClient>();
-
-    try
-    {
-        var databaseName = configuration["CosmosDb:DatabaseName"] ?? throw new ArgumentNullException("CosmosDb:DatabaseName");
-
-        // Create database if it doesn't exist
-        var databaseResponse = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
-        logger.LogInformation("Database '{DatabaseName}' ready", databaseName);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Error initializing CosmosDB");
-        throw;
-    }
-} 

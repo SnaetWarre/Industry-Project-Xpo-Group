@@ -43,17 +43,67 @@ document.addEventListener('DOMContentLoaded', () => {
   // API endpoint configuration
   const API_URL = 'http://localhost:5000';
 
+  // Check if user has registered
+  function hasRegistered() {
+    return localStorage.getItem('chatbotRegistered') === 'true';
+  }
+
+  // Show registration form
+  function showRegistrationForm() {
+    const formHtml = `
+      <div class="registration-form">
+        <h3>Expo registratie</h3>
+        <form id="registrationForm">
+          <div class="form-group">
+            <label for="company">Bedrijfsnaam</label>
+            <input type="text" id="company" name="company" placeholder="Jouw bedrijf" required autocomplete="organization">
+          </div>
+          <div class="form-group">
+            <label for="jobTitle">Functietitel</label>
+            <input type="text" id="jobTitle" name="jobTitle" placeholder="Jouw functie" required autocomplete="job-title">
+          </div>
+          <div class="form-group">
+            <label for="companyDescription">Bedrijfsomschrijving</label>
+            <textarea id="companyDescription" name="companyDescription" placeholder="Wat doet jouw bedrijf?" required></textarea>
+          </div>
+          <button type="submit" class="register-main-btn">Registreer en start chat</button>
+        </form>
+      </div>
+    `;
+    messages.innerHTML = formHtml;
+    // Hide chat input area while registering
+    form.style.display = 'none';
+    // Handle form submission
+    document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const formData = {
+        company: document.getElementById('company').value,
+        jobTitle: document.getElementById('jobTitle').value,
+        companyDescription: document.getElementById('companyDescription').value
+      };
+      trackAnalyticsEvent('form_submission', formData);
+      localStorage.setItem('chatbotRegistered', 'true');
+      await createUserProfile(getSessionId(), formData);
+      // Remove registration form from DOM
+      messages.innerHTML = '';
+      // Show chat input area
+      form.style.display = '';
+      // Re-initialize chat
+      initializeWebsite();
+    });
+  }
+
   // Initialize website configuration
   function initializeWebsite() {
     const config = websiteConfig[websiteId];
+    if (!hasRegistered()) {
+      showRegistrationForm();
+      return;
+    }
     if (config) {
-      // Update bot name in header
       headerTitle.textContent = config.botName;
-
-      // Update welcome message
       const now = new Date();
       const timeString = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-
       messages.innerHTML = `
         <div class="bot-message-container">
           <img src="images/robot.svg" alt="Bot">
@@ -66,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
+      form.style.display = '';
     } else {
       console.error(`Website configuration not found for ID: ${websiteId}`);
     }
@@ -76,6 +127,11 @@ document.addEventListener('DOMContentLoaded', () => {
     windowEl.style.display = 'flex';
     input.focus();
     launcherLabel.style.display = 'none';
+
+    // Show registration form if not registered
+    if (!hasRegistered()) {
+      showRegistrationForm();
+    }
   }
 
   launcher.onclick = openChatbot;
@@ -133,6 +189,25 @@ document.addEventListener('DOMContentLoaded', () => {
       container.appendChild(img);
       container.appendChild(messageWrapper);
       messages.appendChild(container);
+
+      // Registration button (less intrusive, modern look)
+      const lastMessage = messages.lastElementChild;
+      if (lastMessage && lastMessage.classList.contains('bot-message-container')) {
+        const registerButton = document.createElement('button');
+        registerButton.className = 'register-button subtle';
+        registerButton.textContent = 'Expo registratiepagina openen';
+        registerButton.onclick = () => {
+          // Track registration click
+          trackAnalyticsEvent('registration', {});
+          // Redirect to the correct expo registration page
+          let url = '#';
+          if (websiteId === 'ffd') url = 'https://ffd25.registration.xpogroup.com/invitation';
+          else if (websiteId === 'abiss') url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
+          else if (websiteId === 'artisan') url = 'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
+          window.open(url, '_blank');
+        };
+        lastMessage.appendChild(registerButton);
+      }
     }
 
     messages.scrollTop = messages.scrollHeight;
@@ -181,6 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
     addMessage(text, true);
     input.value = '';
     input.disabled = true;
+
+    // Store user message in chatHistory
+    await trackChatMessage(getSessionId(), text, true);
 
     // Show typing indicator
     showTypingIndicator();
@@ -232,8 +310,10 @@ document.addEventListener('DOMContentLoaded', () => {
     disclaimer.classList.add('hidden');
   };
 
-  // Initialize the website configuration
-  initializeWebsite();
+  // Initialize the website configuration if already registered
+  if (hasRegistered()) {
+    initializeWebsite();
+  }
 
   // Initialize resize handles for chat window
   (function initResizers() {
@@ -272,4 +352,148 @@ document.addEventListener('DOMContentLoaded', () => {
       document.addEventListener('mouseup', stopResize);
     }
   })();
+
+  function generateSessionId() {
+    // Generate a GUID-like string
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0,
+        v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function getSessionId() {
+    let sessionId = localStorage.getItem('chatbotSessionId');
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      localStorage.setItem('chatbotSessionId', sessionId);
+    }
+    return sessionId;
+  }
+
+  function trackAnalyticsEvent(eventType, payload = {}) {
+    const sessionId = getSessionId();
+    const event = {
+      sessionId,
+      eventType,
+      payload,
+      timestamp: new Date().toISOString()
+    };
+
+    fetch(`${API_URL}/api/analytics/event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(event)
+    }).catch(error => console.error('Error tracking analytics:', error));
+  }
+
+  async function createUserProfile(sessionId, formData) {
+    try {
+        const response = await fetch(`${API_URL}/api/analytics/profile`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                company: formData.company,
+                jobTitle: formData.jobTitle,
+                companyDescription: formData.companyDescription,
+                chatHistory: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create user profile');
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error creating user profile:', error);
+        throw error;
+    }
+  }
+
+  async function trackChatMessage(sessionId, message, isUser) {
+    try {
+        const response = await fetch(`${API_URL}/api/analytics/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                message: message,
+                isUser: isUser
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to track chat message');
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error tracking chat message:', error);
+        throw error;
+    }
+  }
+
+  function showChatInterface() {
+    const chatContainer = document.querySelector('.chat-container');
+    chatContainer.innerHTML = `
+        <div class="chat-messages"></div>
+        <div class="chat-input">
+            <input type="text" placeholder="Type your message...">
+            <button>Send</button>
+        </div>
+    `;
+
+    const input = chatContainer.querySelector('input');
+    const button = chatContainer.querySelector('button');
+
+    button.addEventListener('click', () => sendMessage());
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+  }
+
+  async function sendMessage() {
+    const input = document.querySelector('.chat-input input');
+    const message = input.value.trim();
+    
+    if (message) {
+        addMessage('user', message);
+        input.value = '';
+        
+        // Here you would typically make an API call to get the bot's response
+        // For now, we'll just echo the message
+        setTimeout(() => {
+            addMessage('bot', `You said: ${message}`);
+        }, 1000);
+    }
+  }
+
+  function initializeWebsite() {
+    const website = document.body.getAttribute('data-website');
+    if (!website) {
+        console.error('Website attribute not set');
+        return;
+    }
+
+    const hasRegistered = localStorage.getItem('hasRegistered') === 'true';
+    if (!hasRegistered) {
+        showRegistrationForm();
+    } else {
+        showChatInterface();
+    }
+  }
 });

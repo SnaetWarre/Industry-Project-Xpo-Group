@@ -421,4 +421,107 @@
 
 .chatbot-disclaimer.hidden {
     display: none;
+}
+
+/* Registration form styles */
+.registration-form {
+    background: white;
+    padding: 28px 24px 24px 24px;
+    border-radius: 14px;
+    margin: 18px 0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    max-width: 340px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.registration-form h3 {
+    margin: 0 0 18px 0;
+    color: #222;
+    font-family: var(--title-font);
+    font-size: 1.3em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    color: #444;
+    font-size: 15px;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 15px;
+    background: #fafbfc;
+    margin-bottom: 2px;
+    transition: border 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--ffd-color);
+    outline: none;
+}
+
+.form-group textarea {
+    height: 80px;
+    resize: vertical;
+}
+
+.register-main-btn {
+    background: var(--ffd-color);
+    color: #fff;
+    border: none;
+    padding: 12px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: var(--title-font);
+    font-weight: 600;
+    width: 100%;
+    margin-top: 10px;
+    box-shadow: 0 2px 8px rgba(219,98,69,0.08);
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.chatbot-container[data-website="abiss"] .register-main-btn { background: var(--abiss-color); }
+.chatbot-container[data-website="artisan"] .register-main-btn { background: var(--artisan-color); }
+.register-main-btn:hover {
+    background: #b94c2e;
+    box-shadow: 0 4px 16px rgba(219,98,69,0.13);
+}
+
+/* Subtle registration button in chat */
+.register-button.subtle {
+    background: none;
+    color: var(--ffd-color);
+    border: none;
+    padding: 0 0 0 4px;
+    font-size: 13px;
+    font-family: var(--title-font);
+    text-decoration: underline dotted;
+    cursor: pointer;
+    margin-top: 6px;
+    margin-left: 2px;
+    transition: color 0.2s;
+    box-shadow: none;
+    display: inline;
+}
+
+.chatbot-container[data-website="abiss"] .register-button.subtle { color: var(--abiss-color); }
+.chatbot-container[data-website="artisan"] .register-button.subtle { color: var(--artisan-color); }
+.register-button.subtle:hover {
+    color: #b94c2e;
+    text-decoration: underline;
 } 
