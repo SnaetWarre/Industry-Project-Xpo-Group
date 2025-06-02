@@ -138,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('chatbotSessionId', newSessionId);
       await trackAnalyticsEvent('form_submission', formData);
       localStorage.setItem('chatbotRegistered', 'true');
-      await createUserProfile(newSessionId, formData);
+      console.log('Registering user with website:', websiteId);
+      await createUserProfile(newSessionId, formData, websiteId);
       // Remove registration form from DOM
       showWelcomeMessage();
       form.style.display = '';
@@ -445,8 +446,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch(error => console.error('Error tracking analytics:', error));
   }
 
-  async function createUserProfile(sessionId, formData) {
+  async function createUserProfile(sessionId, formData, websiteIdArg) {
     try {
+        console.log('createUserProfile payload website:', websiteIdArg);
         const response = await fetch(`${API_URL}/api/analytics/profile`, {
             method: 'POST',
             headers: {
@@ -457,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 company: formData.company,
                 jobTitle: formData.jobTitle,
                 companyDescription: formData.companyDescription,
-                website: websiteId
+                website: websiteIdArg
             })
         });
 
