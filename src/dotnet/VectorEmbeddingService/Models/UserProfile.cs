@@ -27,6 +27,9 @@ public class UserProfile
 
     [JsonPropertyName("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [JsonPropertyName("website")]
+    public string Website { get; set; } = string.Empty;
 }
 
 public class ChatMessage
@@ -39,4 +42,22 @@ public class ChatMessage
 
     [JsonPropertyName("isUser")]
     public bool IsUser { get; set; }
+}
+
+public class UserProfileRequest
+{
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; set; } = string.Empty;
+
+    [JsonPropertyName("company")]
+    public string Company { get; set; } = string.Empty;
+
+    [JsonPropertyName("jobTitle")]
+    public string JobTitle { get; set; } = string.Empty;
+
+    [JsonPropertyName("companyDescription")]
+    public string CompanyDescription { get; set; } = string.Empty;
+
+    [JsonPropertyName("website")]
+    public string Website { get; set; } = string.Empty;
 } 
