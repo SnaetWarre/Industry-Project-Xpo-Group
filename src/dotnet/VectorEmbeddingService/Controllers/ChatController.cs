@@ -128,6 +128,9 @@ public class ChatController : ControllerBase
     // Cache for master exhibitor/participant list documents by website
     private static readonly ConcurrentDictionary<string, EventDocument?> _forcedListCache = new();
 
+    // Store conversation history per session
+    private static readonly ConcurrentDictionary<string, List<ChatMessage>> _conversationHistory = new();
+
     public ChatController(
         CosmosClient cosmosClient,
         IEmbeddingService embeddingService,
@@ -173,146 +176,70 @@ public class ChatController : ControllerBase
             if (string.IsNullOrWhiteSpace(sanitizedInput))
                 return BadRequest("Invalid input after sanitization");
 
+            // Get or initialize conversation history for this session
+            var sessionId = request.SessionId ?? ipAddress;
+            if (!_conversationHistory.TryGetValue(sessionId, out var history))
+            {
+                history = new List<ChatMessage>();
+                _conversationHistory[sessionId] = history;
+            }
+
+            // Add user message to history
+            history.Add(new ChatMessage
+            {
+                Message = sanitizedInput,
+                IsUser = true,
+                Timestamp = DateTime.UtcNow
+            });
+
+            // Use the full conversation history for context
+            var conversationContext = string.Join("\n", history.Select(m => 
+                $"{m.Timestamp:HH:mm:ss} - {(m.IsUser ? "User" : "Bot")}: {m.Message}"));
+
             // Use the full sanitized user query for embedding/vector search
             var queryEmbedding = await _embeddingService.GetEmbeddingAsync(sanitizedInput);
             var similarEvents = await cosmosService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
 
-            // Cache and include the master exhibitor/participant list for Artisan or FFD only
-            EventDocument? forcedEvent = null;
-            if (website == "artisan" || website == "ffd")
+            // Get forced URLs based on website
+            var forcedUrl = website switch
             {
-                if (!_forcedListCache.TryGetValue(website, out forcedEvent))
-                {
-                    var forcedUrl = website == "artisan"
-                        ? "https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/"
-                        : "https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/";
-                    forcedEvent = await cosmosService.GetEventByUrlAsync(forcedUrl);
-                    _forcedListCache[website] = forcedEvent;
-                }
-            }
-            if (forcedEvent != null)
-            {
-                similarEvents.RemoveAll(e => e.Id == forcedEvent.Id);
-                similarEvents.Insert(0, forcedEvent);
-            }
+                "ffd" => "https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/",
+                "artisan" => "https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/",
+                "abiss" => "", // Abiss has no exhibitor list
+                _ => "https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/"
+            };
 
-            // Use keyword extraction only for direct matching (stand/booth/company)
-            var keywords = ExtractKeywords(sanitizedInput);
-            _logger.LogInformation("Extracted keywords: {Keywords}", string.Join(", ", keywords));
-
-            // Direct match logic: robust stand/booth/stande/booth number matching
-            string normalizedInput = sanitizedInput.ToLower();
-            EventDocument? directMatch = null;
-            // Synonyms for stand/booth
-            var standSynonyms = new[] { "stand", "booth", "stand number", "booth number", "stande" };
-            // If the input contains any stand/booth synonym, extract all numbers
-            bool containsStandSynonym = standSynonyms.Any(syn => normalizedInput.Contains(syn));
-            List<string> numbersInQuery = new();
-            if (containsStandSynonym)
+            // Always fetch and include the forced/master document if URL is set
+            if (!string.IsNullOrEmpty(forcedUrl))
             {
-                numbersInQuery = Regex.Matches(normalizedInput, @"\b\d{1,5}\b").Select(m => m.Value).ToList();
-            }
-            foreach (var evt in similarEvents)
-            {
-                if (!string.IsNullOrEmpty(evt.Title) && normalizedInput.Contains(evt.Title.ToLower()))
+                var forcedDoc = await cosmosService.GetEventByUrlAsync(forcedUrl);
+                if (forcedDoc != null && !similarEvents.Any(e => e.Url == forcedDoc.Url))
                 {
-                    directMatch = evt;
-                    break;
+                    similarEvents.Insert(0, forcedDoc); // Always add at the start
+                    _logger.LogInformation($"Forced/master document added to LLM context: Title: {forcedDoc.Title}, Url: {forcedDoc.Url}");
                 }
-                if (containsStandSynonym && evt.StandNumbers != null && evt.StandNumbers.Any(sn => numbersInQuery.Contains(sn)))
+                else if (forcedDoc == null)
                 {
-                    directMatch = evt;
-                    break;
-                }
-            }
-            // Fallback: search all string fields for 'stand 142', 'booth 142', etc. if no direct match
-            if (directMatch == null && containsStandSynonym && numbersInQuery.Any())
-            {
-                foreach (var evt in similarEvents)
-                {
-                    var allFields = new[] { evt.Title, evt.Description, evt.RawTextContent };
-                    foreach (var num in numbersInQuery)
-                    {
-                        foreach (var syn in standSynonyms)
-                        {
-                            var pattern = $"{syn} {num}";
-                            if (allFields.Any(f => !string.IsNullOrEmpty(f) && f.ToLower().Contains(pattern)))
-                            {
-                                directMatch = evt;
-                                break;
-                            }
-                        }
-                        if (directMatch != null) break;
-                    }
-                    if (directMatch != null) break;
+                    _logger.LogWarning($"Forced/master document not found in CosmosDB for URL: {forcedUrl}");
                 }
             }
 
-            // For follow-up questions, always use the last matched event as context and prepend the last LLM answer if available
-            bool isFollowUp = normalizedInput.Contains("that company") || normalizedInput.Contains("that stand") || normalizedInput.Contains("that booth");
-            List<EventDocument> contextEvents = new();
-            string lastLlmContext = string.Empty;
-            string? lastCompanyName = null;
-            if (isFollowUp && _lastMentionedEntity.TryGetValue(ipAddress, out var lastEntity))
+            // Log which documents are being used for context
+            if (similarEvents.Any())
             {
-                lastCompanyName = lastEntity;
-                // Search all similar events for the last company name (case-insensitive, partial match allowed)
-                var lastEvent = similarEvents.FirstOrDefault(e => !string.IsNullOrEmpty(e.Title) && e.Title.ToLower().Contains(lastCompanyName.ToLower()));
-                if (lastEvent != null)
-                {
-                    contextEvents.Add(lastEvent);
-                }
-                // Prepend last LLM answer if available
-                if (_lastLlmAnswer.TryGetValue(ipAddress, out var lastLlm))
-                {
-                    lastLlmContext = $"Previous Bot Answer:\n{lastLlm}\n\n";
-                }
-            }
-            else if (directMatch != null)
-            {
-                // If direct match is a company, use that event as context for all follow-ups
-                contextEvents.Add(directMatch);
-                lastCompanyName = directMatch.Title;
+                var docInfo = string.Join("; ", similarEvents.Select(e => $"Title: {e.Title}, StandNumbers: [{string.Join(", ", e.StandNumbers)}], Url: {e.Url}"));
+                _logger.LogInformation($"Documents used in LLM context: {docInfo}");
             }
             else
             {
-                contextEvents = similarEvents;
-            }
-
-            // If the user asks for more about a company, and we have a last company name, search all similar events for that company and use it as context
-            if (isFollowUp && string.IsNullOrEmpty(lastCompanyName) && _lastLlmAnswer.TryGetValue(ipAddress, out var lastLlmAnswer))
-            {
-                // Try to extract a company name from the last LLM answer (simple heuristic: look for capitalized words)
-                var match = Regex.Match(lastLlmAnswer, @"([A-Z][A-Za-z0-9\- ]{2,})");
-                if (match.Success)
-                {
-                    lastCompanyName = match.Groups[1].Value;
-                    var lastEvent = similarEvents.FirstOrDefault(e => !string.IsNullOrEmpty(e.Title) && e.Title.ToLower().Contains(lastCompanyName.ToLower()));
-                    if (lastEvent != null)
-                    {
-                        contextEvents = new List<EventDocument> { lastEvent };
-                    }
-                }
-            }
-
-            // --- Update memory: store last mentioned company/entity if found ---
-            if (contextEvents.Any())
-            {
-                var firstEvent = contextEvents.First();
-                if (!string.IsNullOrWhiteSpace(firstEvent.Title))
-                {
-                    _lastMentionedEntity[ipAddress] = firstEvent.Title;
-                }
+                _logger.LogInformation("No similar events found for context.");
             }
 
             // Format events for context
-            var eventsContext = FormatEventsContext(contextEvents);
+            var eventsContext = FormatEventsContext(similarEvents);
 
-            // Log the actual context sent to the LLM for debugging
-            _logger.LogInformation("LLM context: {Context}", eventsContext);
-
-            // Construct the enhanced input for the LLM
-            var enhancedInput = $"{lastLlmContext}Relevant Event Information:\n{eventsContext}\n\n---\n\nUser's Question: {sanitizedInput}";
+            // Construct the enhanced input for the LLM with full conversation history and forced URLs
+            var enhancedInput = $"Conversation History:\n{conversationContext}\n\nRelevant Event Information:\n{eventsContext}\n\nForced URLs:\n{forcedUrl}\n\n---\n\nUser's Question: {sanitizedInput}";
 
             // Select the system prompt based on the website
             string systemPrompt = website switch
@@ -339,54 +266,20 @@ public class ChatController : ControllerBase
             var response = await _openAIClient.GetChatCompletionsAsync(chatCompletionsOptions);
             var llmAnswer = response.Value.Choices[0].Message.Content.Trim();
 
-            // If this is a stand-related query, try to extract company name and do a follow-up search
-            if (normalizedInput.Contains("stand") || normalizedInput.Contains("booth"))
+            // Add bot response to history
+            history.Add(new ChatMessage
             {
-                // Try to extract company name from LLM's response
-                var companyMatch = Regex.Match(llmAnswer, @"([A-Z][A-Za-z0-9\- ]{2,})");
-                if (companyMatch.Success)
-                {
-                    var companyName = companyMatch.Groups[1].Value;
-                    _logger.LogInformation("Extracted company name from LLM response: {CompanyName}", companyName);
+                Message = llmAnswer,
+                IsUser = false,
+                Timestamp = DateTime.UtcNow
+            });
 
-                    // Do a follow-up vector search with the company name
-                    var companyEmbedding = await _embeddingService.GetEmbeddingAsync(companyName);
-                    var companyEvents = await cosmosService.SearchSimilarEventsAsync(companyEmbedding, 1, 0.7);
-
-                    if (companyEvents.Any())
-                    {
-                        // Log the full event document that was found
-                        _logger.LogInformation("Found company event document: {EventDocument}", 
-                            JsonSerializer.Serialize(companyEvents[0], new JsonSerializerOptions 
-                            { 
-                                WriteIndented = true 
-                            }));
-
-                        // Add the company details to the context for a new LLM request
-                        var companyContext = FormatEventsContext(companyEvents);
-                        var followUpInput = $"{lastLlmContext}Relevant Event Information:\n{companyContext}\n\n---\n\nUser's Question: {sanitizedInput}";
-
-                        // Get a new response from Azure OpenAI with the company context
-                        var followUpOptions = new ChatCompletionsOptions
-                        {
-                            DeploymentName = _deploymentName,
-                            Messages =
-                            {
-                                new ChatRequestSystemMessage(systemPrompt),
-                                new ChatRequestUserMessage(followUpInput)
-                            },
-                            MaxTokens = 2048,
-                            Temperature = 0.2f
-                        };
-
-                        var followUpResponse = await _openAIClient.GetChatCompletionsAsync(followUpOptions);
-                        llmAnswer = followUpResponse.Value.Choices[0].Message.Content.Trim();
-                    }
-                }
+            // Keep only last 10 messages in history to prevent context window issues
+            if (history.Count > 10)
+            {
+                history.RemoveRange(0, history.Count - 10);
             }
 
-            // Store last LLM answer for follow-up context
-            _lastLlmAnswer[ipAddress] = llmAnswer;
             return Ok(new { response = llmAnswer });
         }
         catch (Exception ex)
