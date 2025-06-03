@@ -8,6 +8,7 @@ using Azure;
 using System.Text.RegularExpressions;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Text.Json;
 
 namespace VectorEmbeddingService.Controllers;
 
@@ -62,6 +63,16 @@ public class ChatController : ControllerBase
         For booth/stand information:
         - Flanders Flooring Days: https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/
         - Use the 'standNumbers' field in the event context as your source of booth data.
+        - IMPORTANT: Only mention companies and stand numbers that are explicitly listed in the provided event data.
+        - Do not make assumptions or mention companies/stands that are not in the data.
+
+        When providing information about exhibitors or stands:
+        1. Craft a natural, conversational response using the provided event details
+        2. Focus on the most relevant information (company name, stand number, key products/services)
+        3. Keep responses concise and easy to read
+        4. Do not simply repeat the raw document content
+        5. If social media links are available, mention them naturally in the response
+        6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
         Respond in the same language as the user's question.";
@@ -74,6 +85,16 @@ public class ChatController : ControllerBase
         For booth/stand information:
         - Artisan Expo: https://www.artisan-xpo.be/en/discover-the-event/list-of-exhibitors/
         - Use the 'standNumbers' field in the event context as your source of booth data.
+        - IMPORTANT: Only mention companies and stand numbers that are explicitly listed in the provided event data.
+        - Do not make assumptions or mention companies/stands that are not in the data.
+
+        When providing information about exhibitors or stands:
+        1. Craft a natural, conversational response using the provided event details
+        2. Focus on the most relevant information (company name, stand number, key products/services)
+        3. Keep responses concise and easy to read
+        4. Do not simply repeat the raw document content
+        5. If social media links are available, mention them naturally in the response
+        6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
         Respond in the same language as the user's question.";
@@ -86,6 +107,16 @@ public class ChatController : ControllerBase
         For booth/stand information:
         - Abiss has no exhibitor list.
         - Use the 'standNumbers' field in the event context as your source of booth data.
+        - IMPORTANT: Only mention companies and stand numbers that are explicitly listed in the provided event data.
+        - Do not make assumptions or mention companies/stands that are not in the data.
+
+        When providing information about exhibitors or stands:
+        1. Craft a natural, conversational response using the provided event details
+        2. Focus on the most relevant information (company name, stand number, key products/services)
+        3. Keep responses concise and easy to read
+        4. Do not simply repeat the raw document content
+        5. If social media links are available, mention them naturally in the response
+        6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
         Respond in the same language as the user's question.";
@@ -307,6 +338,53 @@ public class ChatController : ControllerBase
 
             var response = await _openAIClient.GetChatCompletionsAsync(chatCompletionsOptions);
             var llmAnswer = response.Value.Choices[0].Message.Content.Trim();
+
+            // If this is a stand-related query, try to extract company name and do a follow-up search
+            if (normalizedInput.Contains("stand") || normalizedInput.Contains("booth"))
+            {
+                // Try to extract company name from LLM's response
+                var companyMatch = Regex.Match(llmAnswer, @"([A-Z][A-Za-z0-9\- ]{2,})");
+                if (companyMatch.Success)
+                {
+                    var companyName = companyMatch.Groups[1].Value;
+                    _logger.LogInformation("Extracted company name from LLM response: {CompanyName}", companyName);
+
+                    // Do a follow-up vector search with the company name
+                    var companyEmbedding = await _embeddingService.GetEmbeddingAsync(companyName);
+                    var companyEvents = await cosmosService.SearchSimilarEventsAsync(companyEmbedding, 1, 0.7);
+
+                    if (companyEvents.Any())
+                    {
+                        // Log the full event document that was found
+                        _logger.LogInformation("Found company event document: {EventDocument}", 
+                            JsonSerializer.Serialize(companyEvents[0], new JsonSerializerOptions 
+                            { 
+                                WriteIndented = true 
+                            }));
+
+                        // Add the company details to the context for a new LLM request
+                        var companyContext = FormatEventsContext(companyEvents);
+                        var followUpInput = $"{lastLlmContext}Relevant Event Information:\n{companyContext}\n\n---\n\nUser's Question: {sanitizedInput}";
+
+                        // Get a new response from Azure OpenAI with the company context
+                        var followUpOptions = new ChatCompletionsOptions
+                        {
+                            DeploymentName = _deploymentName,
+                            Messages =
+                            {
+                                new ChatRequestSystemMessage(systemPrompt),
+                                new ChatRequestUserMessage(followUpInput)
+                            },
+                            MaxTokens = 2048,
+                            Temperature = 0.2f
+                        };
+
+                        var followUpResponse = await _openAIClient.GetChatCompletionsAsync(followUpOptions);
+                        llmAnswer = followUpResponse.Value.Choices[0].Message.Content.Trim();
+                    }
+                }
+            }
+
             // Store last LLM answer for follow-up context
             _lastLlmAnswer[ipAddress] = llmAnswer;
             return Ok(new { response = llmAnswer });
