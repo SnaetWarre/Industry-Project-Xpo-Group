@@ -69,31 +69,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // API endpoint configuration
   const API_URL = 'http://localhost:5000';
 
-  // Check if user has registered
-  function hasRegistered() {
-    return localStorage.getItem('chatbotRegistered') === 'true';
+  // Helper to set and get sessionId cookie
+  function setSessionIdCookie(sessionId) {
+    document.cookie = `chatbotSessionId=${sessionId}; path=/; SameSite=Lax`;
   }
-
-  // Show the welcome message in the chat window
-  function showWelcomeMessage() {
-    const config = websiteConfig[websiteId];
-    if (config) {
-      headerTitle.textContent = config.botName;
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-      messages.innerHTML = `
-        <div class="bot-message-container">
-          <img src="images/robot.svg" alt="Bot">
-          <div class="message-wrapper">
-            <div class="bot-name">${config.botName}</div>
-            <div class="chatbot-bubble">
-              ${config.welcomeMessage}
-            </div>
-            <div class="timestamp">${timeString}</div>
-          </div>
-        </div>
-      `;
-    }
+  function getSessionIdCookie() {
+    const match = document.cookie.match(/(?:^|; )chatbotSessionId=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+  function clearSessionIdCookie() {
+    document.cookie = 'chatbotSessionId=; Max-Age=0; path=/; SameSite=Lax';
   }
 
   // Show registration form
@@ -119,13 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
     messages.innerHTML = formHtml;
-    // Hide chat input area while registering
     form.style.display = 'none';
-    // Remove any horizontal overflow on the chat window
     windowEl.style.overflowX = 'hidden';
     messages.style.overflowX = 'hidden';
     addResizeHandles();
-    // Handle form submission
     document.getElementById('registrationForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const formData = {
@@ -134,22 +116,48 @@ document.addEventListener('DOMContentLoaded', () => {
         companyDescription: document.getElementById('companyDescription').value
       };
       // Always get a new sessionId from backend for a new registration
-      const newSessionId = await fetchSessionIdFromBackend();
-      localStorage.setItem('chatbotSessionId', newSessionId);
-      await trackAnalyticsEvent('form_submission', formData);
-      localStorage.setItem('chatbotRegistered', 'true');
-      console.log('Registering user with website:', websiteId);
-      await createUserProfile(newSessionId, formData, websiteId);
-      // Remove registration form from DOM
-      showWelcomeMessage();
+      const response = await fetch(`${API_URL}/api/analytics/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to get sessionId from backend');
+      const data = await response.json();
+      setSessionIdCookie(data.sessionId);
+      await createUserProfile(data.sessionId, formData, websiteId);
+      await trackAnalyticsEvent('chat_start', { ...formData, sessionId: data.sessionId });
+      await trackAnalyticsEvent('form_submission', { ...formData, sessionId: data.sessionId });
+      initializeWebsite();
       form.style.display = '';
     });
   }
 
+  async function createUserProfile(sessionId, formData, websiteIdArg) {
+    try {
+      console.log('createUserProfile payload website:', websiteIdArg, 'sessionId:', sessionId);
+      const response = await fetch(`${API_URL}/api/analytics/profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          company: formData.company,
+          jobTitle: formData.jobTitle,
+          companyDescription: formData.companyDescription,
+          website: websiteIdArg
+        })
+      });
+      if (!response.ok) throw new Error('Failed to create user profile');
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+      throw error;
+    }
+  }
+
   // Initialize website configuration
-  function initializeWebsite() {
+  async function initializeWebsite() {
     const config = websiteConfig[websiteId];
-    if (!hasRegistered()) {
+    if (!(await hasRegistered())) {
       showRegistrationForm();
       return;
     }
@@ -218,15 +226,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Open/close chatbot
-  function openChatbot() {
+  async function openChatbot() {
     windowEl.style.display = 'flex';
     input.focus();
     launcherLabel.style.display = 'none';
     addResizeHandles();
+
+    // Check if session is valid with backend
+    if (hasRegistered()) {
+      const valid = await ensureValidSession();
+      if (!valid) {
+        showRegistrationForm();
+        return;
+      }
+    }
+
     // Show registration form if not registered
     if (!hasRegistered()) {
       showRegistrationForm();
     } else {
+      // Track chat start time only after registration
+      trackAnalyticsEvent('chat_start', {});
       showWelcomeMessage();
       form.style.display = '';
     }
@@ -303,7 +323,22 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.className = 'sticky-register-btn';
       btn.textContent = 'Expo registratiepagina openen';
       btn.onclick = async () => {
-        await trackAnalyticsEvent('registration', {});
+        // Robust analytics event: include sessionId and company if available
+        let sessionId = localStorage.getItem('chatbotSessionId');
+        let company = null;
+        if (sessionId) {
+          try {
+            const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+            if (resp.ok) {
+              const profile = await resp.json();
+              company = profile.company || null;
+            }
+          } catch (e) {
+            console.error('Error fetching profile:', e);
+          }
+        }
+        const payload = { sessionId: sessionId || null, company: company };
+        await trackAnalyticsEvent('registration', payload);
         let url = '#';
         if (websiteId === 'ffd') url = 'https://ffd25.registration.xpogroup.com/invitation';
         else if (websiteId === 'abiss') url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
@@ -354,39 +389,20 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-
-    // Add user message
     addMessage(text, true);
     input.value = '';
     input.disabled = true;
-
-    // Store user message in chatHistory
     await trackChatMessage(text, true);
-
-    // Show typing indicator
     showTypingIndicator();
-
     try {
-      // Send message to backend
       const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: text,
-          website: websiteId,
-          sessionId: await getSessionId()
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, website: websiteId, sessionId: getSessionIdCookie() })
       });
-
       if (!response.ok) throw new Error('Network response was not ok');
-
       const data = await response.json();
-
-      // Hide typing indicator before showing response
       hideTypingIndicator();
-      // Determine bot output: prefer LLM 'response', otherwise format event list
       let botText;
       if (data.response) {
         botText = data.response;
@@ -398,95 +414,84 @@ document.addEventListener('DOMContentLoaded', () => {
         botText = JSON.stringify(data);
       }
       addMessage(botText);
+      await trackChatMessage(botText, false);
     } catch (error) {
       console.error('Error:', error);
-      // Hide typing indicator before showing error
       hideTypingIndicator();
-      addMessage('Sorry, er ging iets mis. Probeer het later opnieuw.');
+      const errorMessage = 'Sorry, er ging iets mis. Probeer het later opnieuw.';
+      addMessage(errorMessage);
+      await trackChatMessage(errorMessage, false);
     }
-
     input.disabled = false;
     input.focus();
   };
 
   // Handle disclaimer close button
-  disclaimerClose.onclick = () => {
-    disclaimer.classList.add('hidden');
-  };
+  if (disclaimerClose) {
+    disclaimerClose.onclick = () => {
+      disclaimer.classList.add('hidden');
+    };
+  }
 
   // Initialize the website configuration if already registered
-  if (hasRegistered()) {
-    initializeWebsite();
-  }
-
-  async function fetchSessionIdFromBackend() {
-    const response = await fetch(`${API_URL}/api/analytics/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Failed to get sessionId from backend');
-    const data = await response.json();
-    return data.sessionId;
-  }
-
-  async function getSessionId() {
-    let sessionId = localStorage.getItem('chatbotSessionId');
-    if (!sessionId) {
-      sessionId = await fetchSessionIdFromBackend();
-      localStorage.setItem('chatbotSessionId', sessionId);
+  (async () => {
+    if (await hasRegistered()) {
+      initializeWebsite();
     }
-    return sessionId;
+  })();
+
+  async function ensureValidSession() {
+    const sessionId = getSessionIdCookie();
+    if (!sessionId) return false;
+    try {
+      const response = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          clearSessionIdCookie();
+          return false;
+        }
+        throw new Error('Failed to check session');
+      }
+      return true;
+    } catch (e) {
+      console.error('Session check failed:', e);
+      return false;
+    }
   }
 
   async function trackAnalyticsEvent(eventType, payload = {}) {
-    const sessionId = await getSessionId();
+    const sessionId = getSessionIdCookie();
+    console.log('trackAnalyticsEvent sessionId:', sessionId);
     fetch(`${API_URL}/api/analytics/event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, eventType, payload })
-    }).catch(error => console.error('Error tracking analytics:', error));
-  }
-
-  async function createUserProfile(sessionId, formData, websiteIdArg) {
-    try {
-        console.log('createUserProfile payload website:', websiteIdArg);
-        const response = await fetch(`${API_URL}/api/analytics/profile`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                sessionId: sessionId,
-                company: formData.company,
-                jobTitle: formData.jobTitle,
-                companyDescription: formData.companyDescription,
-                website: websiteIdArg
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to create user profile');
-        }
-
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error('Error creating user profile:', error);
-        throw error;
-    }
+    })
+    .then(async response => {
+      if (response.status === 440) {
+        showRegistrationForm();
+        addMessage('Je sessie is verlopen of ongeldig. Vul het registratieformulier opnieuw in.');
+      }
+    })
+    .catch(error => console.error('Error tracking analytics:', error));
   }
 
   async function trackChatMessage(message, isUser) {
-    const sessionId = await getSessionId();
+    const sessionId = getSessionIdCookie();
+    console.log('trackChatMessage sessionId:', sessionId);
     try {
       const response = await fetch(`${API_URL}/api/analytics/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, message, isUser })
       });
+      if (response.status === 440) {
+        showRegistrationForm();
+        addMessage('Je sessie is verlopen of ongeldig, ververs de pagina en vul het registratieformulier opnieuw in.');
+        return;
+      }
       if (!response.ok) throw new Error('Failed to track chat message');
       const data = await response.json();
-      // ... handle data as needed
       return data;
     } catch (error) {
       console.error('Error tracking chat message:', error);
@@ -531,18 +536,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function initializeWebsite() {
-    const website = document.body.getAttribute('data-website');
-    if (!website) {
-        console.error('Website attribute not set');
-        return;
-    }
-
-    const hasRegistered = localStorage.getItem('hasRegistered') === 'true';
-    if (!hasRegistered) {
-        showRegistrationForm();
-    } else {
-        showChatInterface();
+  async function hasRegistered() {
+    const sessionId = getSessionIdCookie();
+    if (!sessionId) return false;
+    try {
+      const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+      if (resp.ok) return true;
+      if (resp.status === 404) {
+        clearSessionIdCookie();
+        return false;
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
 });
