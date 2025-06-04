@@ -376,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           query: text,
           website: websiteId,
+          sessionId: await getSessionId()
         }),
       });
 
