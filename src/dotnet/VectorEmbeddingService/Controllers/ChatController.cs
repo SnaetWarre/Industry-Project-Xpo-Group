@@ -75,8 +75,9 @@ public class ChatController : ControllerBase
         6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
-        Respond in the same language as the user's question.";
-
+        Respond in the same language as the user's question.
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk.
+        it causes the html to be generated in the chatbot application itself and being loaded in the dom.";
     private const string SystemPromptArtisan = @"
         You are the specialized assistant for Artisan. 
         Only answer questions about Artisan. 
@@ -97,7 +98,9 @@ public class ChatController : ControllerBase
         6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
-        Respond in the same language as the user's question.";
+        Respond in the same language as the user's question.
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk.
+        it causes the html to be generated in the chatbot application itself and being loaded in the dom.";
 
     private const string SystemPromptAbiss = @"
         You are the specialized assistant for Abiss. 
@@ -119,7 +122,9 @@ public class ChatController : ControllerBase
         6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
-        Respond in the same language as the user's question.";
+        Respond in the same language as the user's question.
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk.
+        it causes the html to be generated in the chatbot application itself and being loaded in the dom.";
 
     
 
