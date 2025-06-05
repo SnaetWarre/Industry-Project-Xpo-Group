@@ -28,19 +28,16 @@ public class AnalyticsController : ControllerBase
     {
         try
         {
-            if (string.IsNullOrEmpty(analyticsEvent.SessionId))
+            string? sessionId = analyticsEvent.SessionId ?? GetSessionIdFromRequest();
+            if (string.IsNullOrEmpty(sessionId))
                 return BadRequest("SessionId is required");
 
             if (string.IsNullOrEmpty(analyticsEvent.EventType))
                 return BadRequest("EventType is required");
 
-            // Only track registration clicks (from the chat registration button)
-            if (analyticsEvent.EventType != "registration")
-                return Ok(new { success = true, ignored = true });
-
             // Look up user profile by sessionId
             var profileQuery = new QueryDefinition("SELECT * FROM c WHERE c.sessionId = @sessionId")
-                .WithParameter("@sessionId", analyticsEvent.SessionId);
+                .WithParameter("@sessionId", sessionId);
             var profileIterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(profileQuery);
             UserProfile? profile = null;
             if (profileIterator.HasMoreResults)
@@ -48,8 +45,20 @@ public class AnalyticsController : ControllerBase
                 var profileResults = await profileIterator.ReadNextAsync();
                 profile = profileResults.FirstOrDefault();
             }
-            string company = profile?.Company ?? "unknown";
-            string website = profile?.Website ?? "unknown";
+            if (profile == null)
+            {
+                _logger.LogWarning("Analytics event received for missing profile. SessionId: {SessionId}, EventType: {EventType}", sessionId, analyticsEvent.EventType);
+                return StatusCode(440, new { success = false, error = "SessionInvalid", message = "User profile/session not found. Please re-register." });
+            }
+            string company = profile.Company ?? "unknown";
+            string website = profile.Website ?? "unknown";
+
+            // Do not create analytics documents for unknown websites
+            if (website == "unknown")
+            {
+                _logger.LogInformation("Skipping analytics event for unknown website (session {SessionId})", sessionId);
+                return Ok(new { success = true, ignored = true });
+            }
 
             // Calculate week key (ISO 8601 week)
             var now = DateTime.UtcNow;
@@ -80,30 +89,64 @@ public class AnalyticsController : ControllerBase
                     UpdatedAt = now
                 };
             }
+
             // Update daily analytics for today
             if (!analytics.Days.TryGetValue(today, out var daily))
             {
                 daily = new DailyAnalytics();
                 analytics.Days[today] = daily;
             }
-            daily.TotalRegistrationClicks++;
-            (daily.UniqueSessions ??= new HashSet<string>()).Add(analyticsEvent.SessionId ?? string.Empty);
-            if (!string.IsNullOrEmpty(company))
+
+            // Add session to unique sessions
+            daily.UniqueSessions.Add(sessionId);
+
+            // Initialize or update session data
+            if (!daily.SessionData.TryGetValue(sessionId, out var sessionData))
             {
-                daily.CompanyStats ??= new Dictionary<string, int>();
-                if (!daily.CompanyStats.ContainsKey(company))
-                    daily.CompanyStats[company] = 0;
-                daily.CompanyStats[company]++;
+                // Only create a new sessionData for chat_start, not for registration
+                if (analyticsEvent.EventType == "chat_start")
+                {
+                    sessionData = new SessionData
+                    {
+                        ChatStartTime = now,
+                        Company = company
+                    };
+                    daily.SessionData[sessionId] = sessionData;
+                }
             }
+
+            // Handle registration click event
+            if (analyticsEvent.EventType == "registration")
+            {
+                // Always update company stats, even if chat was not started
+                if (!string.IsNullOrEmpty(company))
+                {
+                    daily.CompanyStats ??= new Dictionary<string, int>();
+                    if (!daily.CompanyStats.ContainsKey(company))
+                        daily.CompanyStats[company] = 0;
+                    daily.CompanyStats[company]++;
+                }
+                // If you want to track chat-to-registration time, keep the sessionData logic as is
+                if (sessionData != null)
+                {
+                    sessionData.RegistrationClickTime = now;
+                    if (sessionData.ChatStartTime != default)
+                    {
+                        sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
+                    }
+                }
+            }
+
             analytics.UpdatedAt = now;
             await _analyticsContainer.UpsertItemAsync(
                 analytics,
                 new PartitionKey(analytics.Id)
             );
+
             _logger.LogInformation(
                 "Weekly analytics updated: {Id} (session {SessionId}, company {Company}, website {Website}, day {Day})",
                 analytics.Id,
-                analyticsEvent.SessionId,
+                sessionId,
                 company,
                 website,
                 today
@@ -126,7 +169,8 @@ public class AnalyticsController : ControllerBase
         {
             if (kvp.Value is System.Text.Json.JsonElement elem)
             {
-                result[kvp.Key] = ConvertJsonElement(elem);
+                var converted = ConvertJsonElement(elem);
+                if (converted != null) result[kvp.Key] = converted;
             }
             else
             {
@@ -152,12 +196,18 @@ public class AnalyticsController : ControllerBase
             case System.Text.Json.JsonValueKind.Object:
                 var dict = new Dictionary<string, object>();
                 foreach (var prop in elem.EnumerateObject())
-                    dict[prop.Name] = ConvertJsonElement(prop.Value);
+                {
+                    var converted = ConvertJsonElement(prop.Value);
+                    if (converted != null) dict[prop.Name] = converted;
+                }
                 return dict;
             case System.Text.Json.JsonValueKind.Array:
                 var list = new List<object>();
                 foreach (var item in elem.EnumerateArray())
-                    list.Add(ConvertJsonElement(item));
+                {
+                    var converted = ConvertJsonElement(item);
+                    if (converted != null) list.Add(converted);
+                }
                 return list;
             case System.Text.Json.JsonValueKind.Null:
             case System.Text.Json.JsonValueKind.Undefined:
@@ -172,7 +222,8 @@ public class AnalyticsController : ControllerBase
     {
         try
         {
-            if (string.IsNullOrEmpty(request.SessionId))
+            string? sessionId = request.SessionId ?? GetSessionIdFromRequest();
+            if (string.IsNullOrEmpty(sessionId))
                 return BadRequest("SessionId is required");
 
             if (string.IsNullOrEmpty(request.Company))
@@ -187,7 +238,7 @@ public class AnalyticsController : ControllerBase
             var profile = new UserProfile
             {
                 Id = Guid.NewGuid().ToString(),
-                SessionId = request.SessionId,
+                SessionId = sessionId,
                 Company = request.Company,
                 JobTitle = request.JobTitle,
                 CompanyDescription = request.CompanyDescription,
@@ -200,12 +251,12 @@ public class AnalyticsController : ControllerBase
             // Upsert the profile to CosmosDB
             await _userProfilesContainer.UpsertItemAsync(
                 profile,
-                new PartitionKey(profile.SessionId)
+                new PartitionKey(sessionId)
             );
 
             _logger.LogInformation(
                 "User profile created for session {SessionId}",
-                profile.SessionId
+                sessionId
             );
 
             return Ok(new { success = true, id = profile.Id });
@@ -222,7 +273,8 @@ public class AnalyticsController : ControllerBase
     {
         try
         {
-            if (string.IsNullOrEmpty(request.SessionId))
+            string? sessionId = request.SessionId ?? GetSessionIdFromRequest();
+            if (string.IsNullOrEmpty(sessionId))
                 return BadRequest("SessionId is required");
 
             if (string.IsNullOrEmpty(request.Message))
@@ -231,14 +283,17 @@ public class AnalyticsController : ControllerBase
             // Get user profile
             var query = new QueryDefinition(
                 "SELECT * FROM c WHERE c.sessionId = @sessionId")
-                .WithParameter("@sessionId", request.SessionId);
+                .WithParameter("@sessionId", sessionId);
 
             var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(query);
             var results = await iterator.ReadNextAsync();
             var profile = results.FirstOrDefault();
 
             if (profile == null)
-                return NotFound("User profile not found");
+            {
+                _logger.LogWarning("Chat event received for missing profile. SessionId: {SessionId}, Message: {Message}", sessionId, request.Message);
+                return StatusCode(440, new { success = false, error = "SessionInvalid", message = "User profile/session not found. Please re-register." });
+            }
 
             // Check message limit
             var today = DateTime.UtcNow.Date;
@@ -269,7 +324,7 @@ public class AnalyticsController : ControllerBase
             // Update profile
             await _userProfilesContainer.UpsertItemAsync(
                 profile,
-                new PartitionKey(profile.SessionId)
+                new PartitionKey(sessionId)
             );
 
             return Ok(new { 
@@ -315,6 +370,29 @@ public class AnalyticsController : ControllerBase
     {
         var sessionId = Guid.NewGuid().ToString();
         return Ok(new { sessionId });
+    }
+
+    private string? GetSessionIdFromRequest()
+    {
+        // Try to get from request body (for backward compatibility)
+        if (Request.HasFormContentType && Request.Form.ContainsKey("sessionId"))
+            return Request.Form["sessionId"];
+        // Try to get from JSON body
+        if (Request.ContentType != null && Request.ContentType.Contains("application/json"))
+        {
+            using var reader = new StreamReader(Request.Body, leaveOpen: true);
+            var body = reader.ReadToEndAsync().Result;
+            if (!string.IsNullOrEmpty(body) && body.Contains("sessionId"))
+            {
+                var json = System.Text.Json.JsonDocument.Parse(body);
+                if (json.RootElement.TryGetProperty("sessionId", out var sessionIdProp))
+                    return sessionIdProp.GetString();
+            }
+        }
+        // Try to get from cookie
+        if (Request.Cookies.TryGetValue("chatbotSessionId", out var cookieSessionId))
+            return cookieSessionId;
+        return null;
     }
 }
 

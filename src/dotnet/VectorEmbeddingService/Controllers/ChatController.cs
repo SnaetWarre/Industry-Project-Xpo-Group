@@ -75,8 +75,10 @@ public class ChatController : ControllerBase
         6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
-        Respond in the same language as the user's question.";
-
+        Respond in the same language as the user's question.
+        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n). 
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk. 
+        It causes the html to be generated in the chatbot application itself and being loaded in the dom.";
     private const string SystemPromptArtisan = @"
         You are the specialized assistant for Artisan. 
         Only answer questions about Artisan. 
@@ -97,7 +99,10 @@ public class ChatController : ControllerBase
         6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
-        Respond in the same language as the user's question.";
+        Respond in the same language as the user's question.
+        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n). 
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk. 
+        It causes the html to be generated in the chatbot application itself and being loaded in the dom.";
 
     private const string SystemPromptAbiss = @"
         You are the specialized assistant for Abiss. 
@@ -119,7 +124,10 @@ public class ChatController : ControllerBase
         6. Double-check that you are using the correct stand numbers and company names from the data
 
         Use provided event information as your primary source.
-        Respond in the same language as the user's question.";
+        Respond in the same language as the user's question.
+        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n). 
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk. 
+        It causes the html to be generated in the chatbot application itself and being loaded in the dom.";
 
     
 
@@ -280,7 +288,9 @@ public class ChatController : ControllerBase
                 history.RemoveRange(0, history.Count - 10);
             }
 
-            return Ok(new { response = llmAnswer });
+            // Sanitize LLM output before returning
+            string sanitizedLlmAnswer = SanitizeLlmOutput(llmAnswer);
+            return Ok(new { response = sanitizedLlmAnswer });
         }
         catch (Exception ex)
         {
@@ -451,5 +461,18 @@ public class ChatController : ControllerBase
             context += $"\n\n---\n\nNote: There are {events.Count - numEventsToShow} more potentially matching events. You can ask for more details or refine your search.";
 
         return context;
+    }
+
+    // Backend sanitization for LLM output: remove code blocks, inline code, and HTML tags
+    private string SanitizeLlmOutput(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        // Remove code blocks (```...```)
+        text = Regex.Replace(text, @"```[\s\S]*?```", string.Empty);
+        // Remove inline code (`...`)
+        text = Regex.Replace(text, @"`[^`]*`", string.Empty);
+        // Remove HTML tags
+        text = Regex.Replace(text, @"<.*?>", string.Empty);
+        return text.Trim();
     }
 } 
