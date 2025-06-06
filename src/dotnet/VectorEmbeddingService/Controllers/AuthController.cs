@@ -7,22 +7,23 @@ using System.Text;
 
 namespace VectorEmbeddingService.Controllers;
 
+public class User
+{
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+
 [ApiController]
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    // In-memory user store for demo
-    private static readonly Dictionary<string, string> Users = new()
-    {
-        { "admin@kortrijkxpo.be", "RfkeU2VvaM3Xy3LLxc8Jdzn7rbHgMV2pMBec89Rns9h4LfoXzP987908LJKHKJLHJLK876789687YKYIUJKHKJLHIOUJKHLKJHULIHOIUH" }, 
-        { "dashboard", "dashboardpass" }
-    };
-
     private readonly IConfiguration _configuration;
+    private readonly List<User> _users;
 
     public AuthController(IConfiguration configuration)
     {
         _configuration = configuration;
+        _users = _configuration.GetSection("Users").Get<List<User>>() ?? new List<User>();
     }
 
     [HttpPost("login")]
@@ -31,7 +32,8 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest("Username and password are required");
 
-        if (!Users.TryGetValue(request.Username, out var storedPassword) || storedPassword != request.Password)
+        var user = _users.FirstOrDefault(u => u.Username == request.Username && u.Password == request.Password);
+        if (user == null)
             return Unauthorized("Invalid username or password");
 
         var token = GenerateJwtToken(request.Username);
