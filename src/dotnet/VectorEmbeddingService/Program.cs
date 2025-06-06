@@ -98,4 +98,7 @@ app.UseAuthentication(); // Only needed for [Authorize] controllers
 app.UseAuthorization();
 app.MapControllers();
 
+Console.WriteLine("export ASPNETCORE_ENVIRONMENT=Development");
+Console.WriteLine("voer bovenstaande commmando uit in je terminal voor swagger te kunnen gebruiken");
+
 app.Run();
