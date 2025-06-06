@@ -12,6 +12,34 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "VectorEmbeddingService", Version = "v1" });
     options.SwaggerDoc("dashboard", new OpenApiInfo { Title = "Dashboard", Version = "v1" });
+
+    // Add JWT Bearer
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
+    };
+    options.AddSecurityDefinition("Bearer", securityScheme);
+
+    var securityRequirement = new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    };
+    options.AddSecurityRequirement(securityRequirement);
 });
 
 // Add CORS
@@ -64,17 +92,24 @@ builder.Services.AddLogging(logging =>
 // Add JWT authentication, but do not require globally
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = "JwtBearer";
-    options.DefaultChallengeScheme = "JwtBearer";
-}).AddJwtBearer(options =>
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
 {
+    var config = builder.Configuration;
+    var key = config["Jwt:Key"] ?? "supersecretkey1234567890";
+    var issuer = config["Jwt:Issuer"] ?? "VectorEmbeddingService";
+    var audience = config["Jwt:Audience"] ?? "DashboardUsers";
     options.TokenValidationParameters = new()
     {
-        ValidateIssuer = false,
-        ValidateAudience = false,
+        ValidateIssuer = true,
+        ValidateAudience = true,
         ValidateLifetime = true,
-        ValidateIssuerSigningKey = false
-        // For production, set ValidateIssuer/ValidateAudience/IssuerSigningKey as needed
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(key))
     };
 });
 

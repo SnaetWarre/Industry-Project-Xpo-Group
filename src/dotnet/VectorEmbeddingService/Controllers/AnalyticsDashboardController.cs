@@ -9,7 +9,7 @@ namespace VectorEmbeddingService.Controllers;
 
 [ApiController]
 [Route("api/analytics-dashboard")]
-// [Authorize] // No auth for now
+[Authorize] // Require JWT for all dashboard endpoints
 [ApiExplorerSettings(GroupName = "dashboard")]
 public class AnalyticsDashboardController : ControllerBase
 {
