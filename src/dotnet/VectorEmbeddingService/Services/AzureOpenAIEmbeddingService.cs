@@ -1,5 +1,6 @@
 using Azure;
 using Azure.AI.OpenAI;
+using System.Numerics;
 
 namespace VectorEmbeddingService.Services;
 
@@ -75,30 +76,50 @@ public class AzureOpenAIEmbeddingService : IEmbeddingService
     public double CalculateCosineSimilarity(float[] embedding1, float[] embedding2)
     {
         if (embedding1.Length != embedding2.Length)
-        {
             throw new ArgumentException("Embeddings must have the same length");
+
+        int length = embedding1.Length;
+        int simdLength = Vector<float>.Count;
+        int i = 0;
+
+        Vector<float> dotProductVec = Vector<float>.Zero;
+        Vector<float> magnitude1Vec = Vector<float>.Zero;
+        Vector<float> magnitude2Vec = Vector<float>.Zero;
+
+        // SIMD loop
+        for (; i <= length - simdLength; i += simdLength)
+        {
+            var v1 = new Vector<float>(embedding1, i);
+            var v2 = new Vector<float>(embedding2, i);
+
+            dotProductVec += v1 * v2;
+            magnitude1Vec += v1 * v1;
+            magnitude2Vec += v2 * v2;
         }
 
-        double dotProduct = 0;
-        double magnitude1 = 0;
-        double magnitude2 = 0;
+        float dotProduct = 0, magnitude1 = 0, magnitude2 = 0;
+        for (int j = 0; j < simdLength; j++)
+        {
+            dotProduct += dotProductVec[j];
+            magnitude1 += magnitude1Vec[j];
+            magnitude2 += magnitude2Vec[j];
+        }
 
-        for (int i = 0; i < embedding1.Length; i++)
+        // Scalar loop for remaining elements
+        for (; i < length; i++)
         {
             dotProduct += embedding1[i] * embedding2[i];
             magnitude1 += embedding1[i] * embedding1[i];
             magnitude2 += embedding2[i] * embedding2[i];
         }
 
-        magnitude1 = Math.Sqrt(magnitude1);
-        magnitude2 = Math.Sqrt(magnitude2);
+        double mag1 = Math.Sqrt(magnitude1);
+        double mag2 = Math.Sqrt(magnitude2);
 
-        if (magnitude1 == 0 || magnitude2 == 0)
-        {
+        if (mag1 == 0 || mag2 == 0)
             return 0;
-        }
 
-        return dotProduct / (magnitude1 * magnitude2);
+        return dotProduct / (mag1 * mag2);
     }
 
     private static string CleanText(string text)
@@ -111,7 +132,6 @@ public class AzureOpenAIEmbeddingService : IEmbeddingService
         // Remove excessive whitespace and limit length
         var cleaned = System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s+", " ");
         
-        // Limit to approximately 8000 tokens (rough estimate: 1 token ≈ 4 characters)
         const int maxLength = 32000;
         if (cleaned.Length > maxLength)
         {

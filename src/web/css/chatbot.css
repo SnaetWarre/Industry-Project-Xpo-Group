@@ -544,15 +544,16 @@
 }
 
 .sticky-register-btn {
-    position: absolute;
-    bottom: 70px;
-    right: 24px;
-    z-index: 1100;
+    display: inline-block;
+    position: static;
+    margin-left: 16px;
+    margin-bottom: 0;
+    vertical-align: middle;
     background: var(--ffd-color);
     color: #fff;
     border: none;
     border-radius: 24px;
-    padding: 12px 22px;
+    padding: 6px 16px;
     font-size: 15px;
     font-family: var(--title-font);
     font-weight: 600;
@@ -560,7 +561,8 @@
     cursor: pointer;
     transition: background 0.2s, box-shadow 0.2s;
     outline: none;
-    display: block;
+    height: 32px;
+    line-height: 20px;
 }
 .chatbot-container[data-website="abiss"] .sticky-register-btn { background: var(--abiss-color); }
 .chatbot-container[data-website="artisan"] .sticky-register-btn { background: var(--artisan-color); }

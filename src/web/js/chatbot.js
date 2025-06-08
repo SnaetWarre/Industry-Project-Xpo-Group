@@ -225,14 +225,177 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Open/close chatbot
+  // Helper: check if two dates are the same day
+  function isSameDay(date1, date2) {
+    return date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate();
+  }
+
+  // Store all messages in memory
+  let allMessages = [];
+  let visibleMessageCount = 10;
+  let chatHistoryLoaded = false;
+  let isLoadingHistory = false;
+  let lastRenderedScrollToBottom = true;
+
+  // Fetch chat history from backend using sessionId
+  async function fetchChatHistory() {
+    isLoadingHistory = true;
+    renderMessages();
+    const sessionId = getSessionIdCookie();
+    if (!sessionId) { isLoadingHistory = false; return []; }
+    try {
+      const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+      if (!resp.ok) { isLoadingHistory = false; return []; }
+      const profile = await resp.json();
+      if (profile && Array.isArray(profile.chatHistory)) {
+        isLoadingHistory = false;
+        return profile.chatHistory.map(m => ({
+          text: m.message,
+          isUser: m.isUser,
+          timestamp: m.timestamp ? new Date(m.timestamp) : new Date()
+        }));
+      }
+      isLoadingHistory = false;
+      return [];
+    } catch (e) {
+      isLoadingHistory = false;
+      showError('Kon oude berichten niet laden, probeer opnieuw.');
+      return [];
+    }
+  }
+
+  // Show error message in chat
+  function showError(msg) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'chat-error-message';
+    errorDiv.textContent = msg;
+    messages.appendChild(errorDiv);
+  }
+
+  // Modified addMessage to store all messages and re-render
+  function addMessage(text, isUser = false, opts = {}) {
+    const msg = { text, isUser, timestamp: new Date(), ...opts };
+    allMessages.push(msg);
+    lastRenderedScrollToBottom = true;
+    renderMessages();
+  }
+
+  // Render only the last N messages, with een 'Laad oudere berichten' knop als nodig
+  function renderMessages() {
+    messages.innerHTML = '';
+    const total = allMessages.length;
+    const start = Math.max(0, total - visibleMessageCount);
+    const visible = allMessages.slice(start, total);
+    // Loader bij ophalen oude berichten
+    if (isLoadingHistory) {
+      const loader = document.createElement('div');
+      loader.className = 'chat-loading-indicator';
+      loader.setAttribute('aria-live', 'polite');
+      loader.textContent = 'Oude berichten laden...';
+      messages.appendChild(loader);
+    }
+    if (start > 0 && !isLoadingHistory) {
+      const loadOlderBtn = document.createElement('button');
+      loadOlderBtn.textContent = 'Laad oudere berichten';
+      loadOlderBtn.className = 'load-older-btn';
+      loadOlderBtn.setAttribute('aria-label', 'Laad oudere berichten');
+      loadOlderBtn.onclick = async () => {
+        visibleMessageCount = Math.min(visibleMessageCount + 10, allMessages.length);
+        isLoadingHistory = true;
+        renderMessages();
+        // Simuleer laadtijd
+        setTimeout(() => {
+          isLoadingHistory = false;
+          renderMessages();
+        }, 400);
+      };
+      messages.appendChild(loadOlderBtn);
+    }
+    // Groepeer opeenvolgende berichten van dezelfde afzender
+    let prevSender = null;
+    let prevDate = null;
+    visible.forEach((msg, idx) => {
+      const isFirstOfGroup = prevSender !== msg.isUser || !isSameDay(msg.timestamp, prevDate || msg.timestamp);
+      prevSender = msg.isUser;
+      prevDate = msg.timestamp;
+      // Toon datum als het niet vandaag is of als het de eerste van de dag is
+      const now = new Date();
+      if (isFirstOfGroup && !isSameDay(msg.timestamp, now)) {
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'chat-date-label';
+        dateDiv.textContent = msg.timestamp.toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        messages.appendChild(dateDiv);
+      }
+      // Groepeer
+      if (msg.isUser) {
+        const container = document.createElement('div');
+        container.className = 'user-message-container';
+        if (isFirstOfGroup) container.classList.add('first-of-group');
+        const bubble = document.createElement('div');
+        bubble.className = 'chatbot-bubble user';
+        bubble.textContent = msg.text;
+        bubble.setAttribute('aria-label', 'Jouw bericht');
+        const timestamp = document.createElement('div');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = msg.timestamp.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        container.appendChild(bubble);
+        container.appendChild(timestamp);
+        messages.appendChild(container);
+      } else {
+        const container = document.createElement('div');
+        container.className = 'bot-message-container';
+        if (isFirstOfGroup) container.classList.add('first-of-group');
+        const img = document.createElement('img');
+        img.src = 'images/robot.svg';
+        img.alt = 'Bot';
+        const messageWrapper = document.createElement('div');
+        messageWrapper.className = 'message-wrapper';
+        const botName = document.createElement('div');
+        botName.className = 'bot-name';
+        botName.textContent = websiteConfig[websiteId].botName;
+        const bubble = document.createElement('div');
+        bubble.className = 'chatbot-bubble';
+        bubble.innerHTML = parseMarkdown(msg.text);
+        bubble.setAttribute('aria-label', 'Bot bericht');
+        const timestamp = document.createElement('div');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = msg.timestamp.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        messageWrapper.appendChild(botName);
+        messageWrapper.appendChild(bubble);
+        messageWrapper.appendChild(timestamp);
+        container.appendChild(img);
+        container.appendChild(messageWrapper);
+        messages.appendChild(container);
+      }
+    });
+    // Alleen scrollen naar onder als laatste bericht van gebruiker/bot is toegevoegd
+    if (lastRenderedScrollToBottom) {
+      messages.scrollTop = messages.scrollHeight;
+    }
+    updateStickyRegisterButton();
+  }
+
+  // On chat open, load chat history if not already loaded
   async function openChatbot() {
     windowEl.style.display = 'flex';
     input.focus();
     launcherLabel.style.display = 'none';
     addResizeHandles();
-
-    // Check if session is valid with backend
+    visibleMessageCount = 10;
+    if (!chatHistoryLoaded) {
+      isLoadingHistory = true;
+      renderMessages();
+      const history = await fetchChatHistory();
+      if (history.length > 0) {
+        allMessages = history;
+        chatHistoryLoaded = true;
+      }
+      isLoadingHistory = false;
+    }
+    lastRenderedScrollToBottom = true;
+    renderMessages();
     if (hasRegistered()) {
       const valid = await ensureValidSession();
       if (!valid) {
@@ -240,14 +403,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     }
-
-    // Show registration form if not registered
     if (!hasRegistered()) {
       showRegistrationForm();
     } else {
-      // Track chat start time only after registration
       trackAnalyticsEvent('chat_start', {});
-      showWelcomeMessage();
       form.style.display = '';
     }
   }
@@ -270,85 +429,41 @@ document.addEventListener('DOMContentLoaded', () => {
     return text;
   }
 
-  // Add message to chat
-  function addMessage(text, isUser = false) {
-    if (isUser) {
-      const container = document.createElement('div');
-      container.className = 'user-message-container';
-      const bubble = document.createElement('div');
-      bubble.className = 'chatbot-bubble user';
-      bubble.textContent = text;
-      const timestamp = document.createElement('div');
-      timestamp.className = 'timestamp';
-      const now = new Date();
-      timestamp.textContent = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-      container.appendChild(bubble);
-      container.appendChild(timestamp);
-      messages.appendChild(container);
-    } else {
-      const container = document.createElement('div');
-      container.className = 'bot-message-container';
-      const img = document.createElement('img');
-      img.src = 'images/robot.svg';
-      img.alt = 'Bot';
-      const messageWrapper = document.createElement('div');
-      messageWrapper.className = 'message-wrapper';
-      const botName = document.createElement('div');
-      botName.className = 'bot-name';
-      botName.textContent = websiteConfig[websiteId].botName;
-      const bubble = document.createElement('div');
-      bubble.className = 'chatbot-bubble';
-      bubble.innerHTML = parseMarkdown(text);
-      const timestamp = document.createElement('div');
-      timestamp.className = 'timestamp';
-      const now = new Date();
-      timestamp.textContent = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-      messageWrapper.appendChild(botName);
-      messageWrapper.appendChild(bubble);
-      messageWrapper.appendChild(timestamp);
-      container.appendChild(img);
-      container.appendChild(messageWrapper);
-      messages.appendChild(container);
-    }
-    messages.scrollTop = messages.scrollHeight;
-    updateStickyRegisterButton();
-  }
+  // In DOMContentLoaded, after selecting headerTitle, add the button to the header
+  const header = document.querySelector('.chatbot-header');
+  let registerBtn = document.createElement('button');
+  registerBtn.id = 'stickyRegisterBtn';
+  registerBtn.className = 'sticky-register-btn';
+  registerBtn.textContent = 'Expo registratiepagina openen';
+  registerBtn.setAttribute('aria-label', 'Expo registratiepagina openen');
+  registerBtn.style.display = 'none';
+  // Insert the button immediately after the headerTitle (FLORBot text)
+  headerTitle.insertAdjacentElement('afterend', registerBtn);
 
-  // Sticky registration button logic
-  function updateStickyRegisterButton() {
-    let btn = document.getElementById('stickyRegisterBtn');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = 'stickyRegisterBtn';
-      btn.className = 'sticky-register-btn';
-      btn.textContent = 'Expo registratiepagina openen';
-      btn.onclick = async () => {
-        // Robust analytics event: include sessionId and company if available
-        let sessionId = localStorage.getItem('chatbotSessionId');
-        let company = null;
-        if (sessionId) {
-          try {
-            const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
-            if (resp.ok) {
-              const profile = await resp.json();
-              company = profile.company || null;
-            }
-          } catch (e) {
-            console.error('Error fetching profile:', e);
-          }
+  registerBtn.onclick = async () => {
+    let sessionId = localStorage.getItem('chatbotSessionId');
+    let company = null;
+    if (sessionId) {
+      try {
+        const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+        if (resp.ok) {
+          const profile = await resp.json();
+          company = profile.company || null;
         }
-        const payload = { sessionId: sessionId || null, company: company };
-        await trackAnalyticsEvent('registration', payload);
-        let url = '#';
-        if (websiteId === 'ffd') url = 'https://ffd25.registration.xpogroup.com/invitation';
-        else if (websiteId === 'abiss') url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
-        else if (websiteId === 'artisan') url = 'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
-        window.open(url, '_blank');
-      };
-      windowEl.appendChild(btn);
+      } catch (e) {}
     }
-    // Only show if user is registered and has not exceeded message limit (or always, if you want)
-    btn.style.display = hasRegistered() ? 'block' : 'none';
+    const payload = { sessionId: sessionId || null, company: company };
+    await trackAnalyticsEvent('registration', payload);
+    let url = '#';
+    if (websiteId === 'ffd') url = 'https://ffd25.registration.xpogroup.com/invitation';
+    else if (websiteId === 'abiss') url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
+    else if (websiteId === 'artisan') url = 'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
+    window.open(url, '_blank');
+  };
+
+  // Update button visibility based on registration
+  async function updateStickyRegisterButton() {
+    registerBtn.style.display = (await hasRegistered()) ? 'inline-block' : 'none';
   }
 
   // Add typing indicator
@@ -384,25 +499,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Handle form submission
+  // On chat form submit, check/create profile before sending message
   form.onsubmit = async (e) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    addMessage(text, true);
+    // Toon direct het bericht met status 'Verzenden...'
+    const sendingMsg = { text, isUser: true, timestamp: new Date(), sending: true };
+    allMessages.push(sendingMsg);
+    lastRenderedScrollToBottom = true;
+    renderMessages();
     input.value = '';
     input.disabled = true;
+    // Ensure profile exists before sending message
+    const sessionId = getSessionIdCookie();
+    if (sessionId) {
+      const profileResp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+      if (profileResp.status === 404) {
+        // Create profile if not exists
+        const regData = JSON.parse(localStorage.getItem('registrationData') || '{}');
+        await createUserProfile(sessionId, regData, websiteId);
+      }
+    }
     await trackChatMessage(text, true);
     showTypingIndicator();
     try {
       const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text, website: websiteId, sessionId: getSessionIdCookie() })
+        body: JSON.stringify({ query: text, website: websiteId, sessionId })
       });
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       hideTypingIndicator();
+      // Vervang 'Verzenden...' status door het echte bericht
+      allMessages = allMessages.filter(m => !m.sending);
+      addMessage(text, true); // user message definitief
       let botText;
       if (data.response) {
         botText = data.response;
@@ -416,11 +548,10 @@ document.addEventListener('DOMContentLoaded', () => {
       addMessage(botText);
       await trackChatMessage(botText, false);
     } catch (error) {
-      console.error('Error:', error);
       hideTypingIndicator();
-      const errorMessage = 'Sorry, er ging iets mis. Probeer het later opnieuw.';
-      addMessage(errorMessage);
-      await trackChatMessage(errorMessage, false);
+      allMessages = allMessages.filter(m => !m.sending);
+      showError('Sorry, er ging iets mis. Probeer het later opnieuw.');
+      await trackChatMessage('Sorry, er ging iets mis. Probeer het later opnieuw.', false);
     }
     input.disabled = false;
     input.focus();
@@ -552,3 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+// LAZY-LOADING ASSETS EXPLANATION:
+// To further optimize, you can lazy-load chatbot assets (JS, CSS, images) only when the user opens the chat window.
+// For example, use dynamic import('chatbot.js') on launcher click, or only inject CSS/images when openChatbot() is called.
+// This reduces initial page load time and memory usage for users who never open the chat.

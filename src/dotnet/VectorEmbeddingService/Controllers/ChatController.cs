@@ -133,11 +133,17 @@ public class ChatController : ControllerBase
 
     // Store last LLM answer per IP for follow-up context
     private static readonly ConcurrentDictionary<string, string> _lastLlmAnswer = new();
-    // Cache for master exhibitor/participant list documents by website
+    // Cache for master exhibitor/participant list documents by website (URL as key)
     private static readonly ConcurrentDictionary<string, EventDocument?> _forcedListCache = new();
 
     // Store conversation history per session
     private static readonly ConcurrentDictionary<string, List<ChatMessage>> _conversationHistory = new();
+
+    // LRU cache for extra queried event documents (context docs), max 20 entries
+    private static readonly ConcurrentDictionary<string, EventDocument> _contextDocCache = new();
+    private static readonly LinkedList<string> _contextDocLru = new();
+    private static readonly object _contextDocLock = new();
+    private const int ContextDocCacheMaxSize = 20;
 
     public ChatController(
         CosmosClient cosmosClient,
@@ -220,7 +226,13 @@ public class ChatController : ControllerBase
             // Always fetch and include the forced/master document if URL is set
             if (!string.IsNullOrEmpty(forcedUrl))
             {
-                var forcedDoc = await cosmosService.GetEventByUrlAsync(forcedUrl);
+                // Check cache first
+                if (!_forcedListCache.TryGetValue(forcedUrl, out var forcedDoc))
+                {
+                    // Not cached: fetch from CosmosDB and cache forever
+                    forcedDoc = await cosmosService.GetEventByUrlAsync(forcedUrl);
+                    _forcedListCache[forcedUrl] = forcedDoc;
+                }
                 if (forcedDoc != null && !similarEvents.Any(e => e.Url == forcedDoc.Url))
                 {
                     similarEvents.Insert(0, forcedDoc); // Always add at the start
@@ -241,6 +253,35 @@ public class ChatController : ControllerBase
             else
             {
                 _logger.LogInformation("No similar events found for context.");
+            }
+
+            // After getting similarEvents, add each to the LRU context cache
+            foreach (var ev in similarEvents)
+            {
+                if (string.IsNullOrEmpty(ev.Id)) continue;
+                lock (_contextDocLock)
+                {
+                    if (_contextDocCache.ContainsKey(ev.Id))
+                    {
+                        // Move to most recent in LRU
+                        _contextDocLru.Remove(ev.Id);
+                        _contextDocLru.AddLast(ev.Id);
+                    }
+                    else
+                    {
+                        _contextDocCache[ev.Id] = ev;
+                        _contextDocLru.AddLast(ev.Id);
+                        if (_contextDocLru.Count > ContextDocCacheMaxSize)
+                        {
+                            var oldest = _contextDocLru.First?.Value;
+                            if (oldest != null)
+                            {
+                                _contextDocCache.TryRemove(oldest, out _);
+                                _contextDocLru.RemoveFirst();
+                            }
+                        }
+                    }
+                }
             }
 
             // Format events for context
@@ -440,6 +481,17 @@ public class ChatController : ControllerBase
         for (int i = 0; i < numEventsToShow; i++)
         {
             var eventDoc = events[i];
+            // Try to get the freshest version from the LRU cache
+            lock (_contextDocLock)
+            {
+                if (!string.IsNullOrEmpty(eventDoc.Id) && _contextDocCache.TryGetValue(eventDoc.Id, out var cachedDoc))
+                {
+                    eventDoc = cachedDoc;
+                    // Move to most recent in LRU
+                    _contextDocLru.Remove(eventDoc.Id);
+                    _contextDocLru.AddLast(eventDoc.Id);
+                }
+            }
             var title = eventDoc.Title;
             var url = eventDoc.Url;
             var description = eventDoc.Description;
