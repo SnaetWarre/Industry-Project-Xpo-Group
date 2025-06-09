@@ -10,3 +10,23 @@ All notable changes to Event Chatbot & Vector Embedding Service will be document
 - Scrapy-based web scraper for event data ingestion
 - Python utilities for data cleaning
 - Vanilla Javascript as frontend
+
+## [v0.2.0] - 2024-05-31
+
+### Added
+- Conversational entity tracking and follow-up query support in ChatController
+- LRU caching for context documents to improve performance
+- SIMD-optimized embedding similarity calculation for faster search
+- JWT authentication and secure dashboard endpoints
+- Analytics: registration tracking, user profile creation, and session ID management
+- Sticky registration button and improved registration flow in chatbot UI
+- New endpoints for dashboard analytics and user stats
+
+### Changed
+- Enhanced security: stricter output sanitization, markdown-only LLM responses, and cookie-based session management
+- Improved event search and context handling for chat
+- Refactored chatbot.js for better chat history and error handling
+
+### Fixed
+- Bugfixes for session handling, frontend chat history, and event data ingestion
+- Addressed vulnerabilities in dependencies

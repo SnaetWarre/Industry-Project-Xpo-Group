@@ -1,4 +1,4 @@
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
 
 # Event Chatbot & Vector Embedding Service
 
@@ -25,22 +25,30 @@ This project provides a full-stack solution for event Q&A using Retrieval-Augmen
 ├── .gitignore
 ├── Industry-Project-Xpo-Group.sln
 ├── plan.md
-├── project_tree.txt
 ├── README.md
 ├── requirements.txt
 ├── scrapy.cfg
 └── src
     ├── dotnet
-    │   ├── dotnet.txt
     │   └── VectorEmbeddingService
     │       ├── appsettings.example.json
     │       ├── appsettings.json
+    │       ├── bin
     │       ├── Controllers
-    │       │   └── EventsController.cs
+    │       │   ├── AbissController.cs
+    │       │   ├── AnalyticsController.cs
+    │       │   ├── AnalyticsDashboardController.cs
+    │       │   ├── ArtisanController.cs
+    │       │   ├── AuthController.cs
+    │       │   ├── ChatController.cs
+    │       │   ├── FfdController.cs
     │       ├── Models
+    │       │   ├── AnalyticsEvent.cs
     │       │   ├── ChatRequest.cs
     │       │   ├── EventDocument.cs
-    │       │   └── SearchRequest.cs
+    │       │   ├── SearchRequest.cs
+    │       │   └── UserProfile.cs
+    │       ├── obj
     │       ├── Program.cs
     │       ├── Services
     │       │   ├── AzureOpenAIEmbeddingService.cs
@@ -50,17 +58,29 @@ This project provides a full-stack solution for event Q&A using Retrieval-Augmen
     │       ├── upload_to_vector_db.py
     │       ├── vector_api_client.py
     │       └── VectorEmbeddingService.csproj
-    └── python
-        │   
-        ├── scraper
-        │   ├── items.py
-        │   ├── middlewares.py
-        │   ├── settings.py
-        │   └── spiders
-        │       ├── event_site_spider_clean.py
-        │       └── event_site_spider.py
-        └── utils
-            └── clean_json.py
+    ├── python
+    │   ├── scraper
+    │   │   ├── items.py
+    │   │   ├── middlewares.py
+    │   │   ├── settings.py
+    │   │   └── spiders
+    │   │       ├── event_site_spider.py
+    │   │       └── event_site_spider_clean.py
+    │   └── utils
+    │       └── clean_json.py
+    └── web
+        ├── css
+        │   └── chatbot.css
+        ├── images
+        │   └── robot.svg
+        ├── importready
+        │   ├── abiss-bot.js
+        │   ├── artisan-bot.js
+        │   ├── ffd-bot.js
+        │   └── importtest.html
+        ├── index.html
+        └── js
+            └── chatbot.js
 ```
 
 ---
