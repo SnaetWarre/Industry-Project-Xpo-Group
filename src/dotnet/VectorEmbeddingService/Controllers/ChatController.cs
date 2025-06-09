@@ -198,6 +198,25 @@ public class ChatController : ControllerBase
                 _conversationHistory[sessionId] = history;
             }
 
+            // --- Conversational entity tracking: augment query if follow-up reference ---
+            if (IsFollowUpReference(sanitizedInput) && _lastMentionedEntity.TryGetValue(sessionId, out var lastEntity) && !string.IsNullOrWhiteSpace(lastEntity))
+            {
+                // If the last entity is a stand number, resolve it to a company name and use it for this turn
+                if (Regex.IsMatch(lastEntity, @"^\d{1,4}$"))
+                {
+                    var allEvents = await cosmosService.GetAllEventsAsync();
+                    var eventByStand = allEvents.FirstOrDefault(ev => ev.StandNumbers != null && ev.StandNumbers.Any(sn => sn == lastEntity));
+                    if (eventByStand != null && !string.IsNullOrWhiteSpace(eventByStand.Title))
+                    {
+                        lastEntity = eventByStand.Title;
+                        _lastMentionedEntity[sessionId] = lastEntity;
+                        _logger.LogInformation($"Resolved stand number to company: {lastEntity}");
+                    }
+                }
+                sanitizedInput = lastEntity + " " + sanitizedInput;
+                _logger.LogInformation($"Augmented follow-up query with last entity: {sanitizedInput}");
+            }
+
             // Add user message to history
             history.Add(new ChatMessage
             {
@@ -207,14 +226,13 @@ public class ChatController : ControllerBase
             });
 
             // Use the full conversation history for context
-            var conversationContext = string.Join("\n", history.Select(m => 
+            var conversationContext = string.Join("\n", history.Select(m =>
                 $"{m.Timestamp:HH:mm:ss} - {(m.IsUser ? "User" : "Bot")}: {m.Message}"));
 
-            // Use the full sanitized user query for embedding/vector search
-            var queryEmbedding = await _embeddingService.GetEmbeddingAsync(sanitizedInput);
-            var similarEvents = await cosmosService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
-
-            // Get forced URLs based on website
+            // --- Direct stand number lookup before vector search ---
+            string standNumber = ExtractStandNumberFromQuery(sanitizedInput);
+            EventDocument directStandMatch = null;
+            List<EventDocument> similarEvents;
             var forcedUrl = website switch
             {
                 "ffd" => "https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/",
@@ -222,20 +240,42 @@ public class ChatController : ControllerBase
                 "abiss" => "", // Abiss has no exhibitor list
                 _ => "https://www.flandersflooringdays.com/en/discover-the-event/participants-2025/"
             };
+            if (!string.IsNullOrEmpty(standNumber))
+            {
+                var allEvents = await cosmosService.GetAllEventsAsync();
+                directStandMatch = allEvents.FirstOrDefault(ev => ev.StandNumbers != null && ev.StandNumbers.Any(sn => sn == standNumber));
+                if (directStandMatch != null)
+                {
+                    var vectorEvents = await cosmosService.SearchSimilarEventsAsync(await _embeddingService.GetEmbeddingAsync(sanitizedInput), request.TopK ?? 5, request.Threshold ?? 0.5);
+                    similarEvents = new List<EventDocument> { directStandMatch };
+                    similarEvents.AddRange(vectorEvents.Where(ev => ev.Id != directStandMatch.Id));
+                    // Always set last mentioned entity to company name, not stand number, before any follow-up
+                    _lastMentionedEntity[sessionId] = directStandMatch.Title;
+                    _logger.LogInformation($"Direct stand number match found: {directStandMatch.Title} for stand {standNumber}");
+                }
+                else
+                {
+                    var queryEmbedding = await _embeddingService.GetEmbeddingAsync(sanitizedInput);
+                    similarEvents = await cosmosService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
+                }
+            }
+            else
+            {
+                var queryEmbedding = await _embeddingService.GetEmbeddingAsync(sanitizedInput);
+                similarEvents = await cosmosService.SearchSimilarEventsAsync(queryEmbedding, request.TopK ?? 5, request.Threshold ?? 0.5);
+            }
 
             // Always fetch and include the forced/master document if URL is set
             if (!string.IsNullOrEmpty(forcedUrl))
             {
-                // Check cache first
                 if (!_forcedListCache.TryGetValue(forcedUrl, out var forcedDoc))
                 {
-                    // Not cached: fetch from CosmosDB and cache forever
                     forcedDoc = await cosmosService.GetEventByUrlAsync(forcedUrl);
                     _forcedListCache[forcedUrl] = forcedDoc;
                 }
                 if (forcedDoc != null && !similarEvents.Any(e => e.Url == forcedDoc.Url))
                 {
-                    similarEvents.Insert(0, forcedDoc); // Always add at the start
+                    similarEvents.Insert(0, forcedDoc);
                     _logger.LogInformation($"Forced/master document added to LLM context: Title: {forcedDoc.Title}, Url: {forcedDoc.Url}");
                 }
                 else if (forcedDoc == null)
@@ -244,51 +284,18 @@ public class ChatController : ControllerBase
                 }
             }
 
-            // Log which documents are being used for context
-            if (similarEvents.Any())
-            {
-                var docInfo = string.Join("; ", similarEvents.Select(e => $"Title: {e.Title}, StandNumbers: [{string.Join(", ", e.StandNumbers)}], Url: {e.Url}"));
-                _logger.LogInformation($"Documents used in LLM context: {docInfo}");
-            }
-            else
-            {
-                _logger.LogInformation("No similar events found for context.");
-            }
-
-            // After getting similarEvents, add each to the LRU context cache
-            foreach (var ev in similarEvents)
-            {
-                if (string.IsNullOrEmpty(ev.Id)) continue;
-                lock (_contextDocLock)
-                {
-                    if (_contextDocCache.ContainsKey(ev.Id))
-                    {
-                        // Move to most recent in LRU
-                        _contextDocLru.Remove(ev.Id);
-                        _contextDocLru.AddLast(ev.Id);
-                    }
-                    else
-                    {
-                        _contextDocCache[ev.Id] = ev;
-                        _contextDocLru.AddLast(ev.Id);
-                        if (_contextDocLru.Count > ContextDocCacheMaxSize)
-                        {
-                            var oldest = _contextDocLru.First?.Value;
-                            if (oldest != null)
-                            {
-                                _contextDocCache.TryRemove(oldest, out _);
-                                _contextDocLru.RemoveFirst();
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Format events for context
+            // Use the full conversation history for context
             var eventsContext = FormatEventsContext(similarEvents);
 
+            // Optionally add last mentioned entity to the LLM prompt
+            string lastEntityForPrompt = string.Empty;
+            if (_lastMentionedEntity.TryGetValue(sessionId, out var entityForPrompt) && !string.IsNullOrWhiteSpace(entityForPrompt))
+            {
+                lastEntityForPrompt = $"Last mentioned entity: {entityForPrompt}\n";
+            }
+
             // Construct the enhanced input for the LLM with full conversation history and forced URLs
-            var enhancedInput = $"Conversation History:\n{conversationContext}\n\nRelevant Event Information:\n{eventsContext}\n\nForced URLs:\n{forcedUrl}\n\n---\n\nUser's Question: {sanitizedInput}";
+            var enhancedInput = $"{(lastEntityForPrompt ?? string.Empty)}Conversation History:\n{conversationContext}\n\nRelevant Event Information:\n{eventsContext}\n\nForced URLs:\n{forcedUrl}\n\n---\n\nUser's Question: {sanitizedInput}";
 
             // Select the system prompt based on the website
             string systemPrompt = website switch
@@ -322,6 +329,33 @@ public class ChatController : ControllerBase
                 IsUser = false,
                 Timestamp = DateTime.UtcNow
             });
+
+            // --- Conversational entity tracking: extract and store last mentioned entity ---
+            var mainEntity = ExtractMainEntityFromLlmAnswer(llmAnswer);
+            if (string.IsNullOrWhiteSpace(mainEntity))
+            {
+                mainEntity = ExtractMainEntityFromEvents(similarEvents ?? new List<EventDocument>());
+            }
+            if (!string.IsNullOrWhiteSpace(mainEntity))
+            {
+                _lastMentionedEntity[sessionId] = mainEntity;
+                _logger.LogInformation($"Updated last mentioned entity for session {sessionId}: {mainEntity}");
+            }
+
+            // --- Direct company link logic ---
+            // If the user asks for a direct link to the company, try to find and return it
+            if (IsDirectCompanyLinkRequest(sanitizedInput) && !string.IsNullOrWhiteSpace(mainEntity))
+            {
+                var directEvent = (similarEvents ?? new List<EventDocument>()).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e?.Title) && e.Title!.ToLower().Contains(mainEntity.ToLower()));
+                if (directEvent != null)
+                {
+                    var directUrl = GetDirectCompanyUrl(directEvent);
+                    if (!string.IsNullOrWhiteSpace(directUrl))
+                    {
+                        return Ok(new { response = $"De rechtstreekse link naar **{mainEntity}** is: {directUrl}" });
+                    }
+                }
+            }
 
             // Keep only last 10 messages in history to prevent context window issues
             if (history.Count > 10)
@@ -526,5 +560,91 @@ public class ChatController : ControllerBase
         // Remove HTML tags
         text = Regex.Replace(text, @"<.*?>", string.Empty);
         return text.Trim();
+    }
+
+    // Helper: Detect if the query is a follow-up reference (e.g., 'deze deelnemer', 'deze exposant', etc.)
+    private bool IsFollowUpReference(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return false;
+        var followUpPhrases = new[]
+        {
+            // English
+            "this participant", "this exhibitor", "this company", "this brand", "this booth", "this stand",
+            // Dutch
+            "deze deelnemer", "deze exposant", "deze stand", "deze participant", "deze company", "deze firma",
+            "deze exhibitor", "deze brand", "deze organisatie", "deze booth", "deze firma", "deze onderneming",
+            // French
+            "ce participant", "cet exposant", "cette entreprise", "cette marque", "ce stand", "cette firme",
+            // German
+            "dieser teilnehmer", "dieser aussteller", "diese firma", "diese marke", "dieser stand", "dieses unternehmen"
+        };
+        var lower = query.ToLowerInvariant();
+        return followUpPhrases.Any(phrase => lower.Contains(phrase));
+    }
+
+    // Helper: Extract the main entity (company/exhibitor name) from the top relevant event
+    private string ExtractMainEntityFromEvents(List<EventDocument>? events)
+    {
+        if (events == null || events.Count == 0) return string.Empty;
+        var top = events[0];
+        if (!string.IsNullOrWhiteSpace(top?.Title) && top.Title!.Length < 100)
+            return top.Title;
+        if (events.Count > 1 && !string.IsNullOrWhiteSpace(events[1]?.Title) && events[1]!.Title!.Length < 100)
+            return events[1]!.Title;
+        return string.Empty;
+    }
+
+    // Helper: Extract the main entity (company/exhibitor name) from the LLM answer's first bolded text (**...**)
+    private string ExtractMainEntityFromLlmAnswer(string? llmAnswer)
+    {
+        if (string.IsNullOrWhiteSpace(llmAnswer)) return string.Empty;
+        var match = Regex.Match(llmAnswer, @"\*\*(.*?)\*\*");
+        if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value))
+            return match.Groups[1].Value.Trim();
+        return string.Empty;
+    }
+
+    // Helper: Detect if the query is a direct company link request
+    private bool IsDirectCompanyLinkRequest(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return false;
+        var phrases = new[]
+        {
+            "directe link", "rechtstreekse link", "website van", "company website", "direct link", "eigen website", "site van", "link van het bedrijf", "link van de firma", "link naar de firma", "link naar het bedrijf"
+        };
+        var lower = query.ToLowerInvariant();
+        return phrases.Any(phrase => lower.Contains(phrase));
+    }
+
+    // Helper: Get the best direct company URL from an event document
+    private string? GetDirectCompanyUrl(EventDocument? eventDoc)
+    {
+        if (eventDoc == null) return null;
+        if (!string.IsNullOrWhiteSpace(eventDoc.Url) && !(eventDoc.Url.Contains("flandersflooringdays.com") || eventDoc.Url.Contains("artisan-xpo.be") || eventDoc.Url.Contains("abissummit")))
+        {
+            return eventDoc.Url;
+        }
+        if (eventDoc.SocialMediaLinks != null)
+        {
+            foreach (var link in eventDoc.SocialMediaLinks)
+            {
+                if (!string.IsNullOrWhiteSpace(link) && (link.Contains(".com") || link.Contains(".be") || link.Contains(".nl")) && !(link.Contains("flandersflooringdays.com") || link.Contains("artisan-xpo.be") || link.Contains("abissummit")))
+                {
+                    return link;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Helper: Extract stand/booth number from the query (e.g., 'stand 142', 'booth 142')
+    private string ExtractStandNumberFromQuery(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return string.Empty;
+        // Regex: look for 'stand' or 'booth' followed by a number (1-4 digits)
+        var match = Regex.Match(query, @"\b(?:stand|booth)\s*[:#]??\s*(\d{1,4})", RegexOptions.IgnoreCase);
+        if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value))
+            return match.Groups[1].Value.Trim();
+        return string.Empty;
     }
 } 
