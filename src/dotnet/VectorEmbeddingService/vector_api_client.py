@@ -102,25 +102,41 @@ class VectorApiClient:
         container = container or self.default_container
         try:
             url = f"{self.base_url}/api/{container}/bulk-upload"
-            payload = {"events": events}
             
             self.logger.info(f"Uploading {len(events)} events to vector database in container '{container}'")
-            successful_upserts = 0
-            total_events = len(events)
-            failed_events = []
             
+            # Transform events to match API's expected format
+            transformed_events = []
             for event in events:
+                transformed_event = {
+                    "title": event.get("title", ""),
+                    "description": event.get("description", ""),
+                    "url": event.get("url", ""),
+                    "socialmedia_links": event.get("socialmedia_links", []),
+                    "stand_numbers": event.get("stand_numbers", []) if isinstance(event.get("stand_numbers"), list) else [],
+                    "raw_text_content": event.get("raw_text_content", ""),
+                    "source_type": event.get("source_type", "")
+                }
+                transformed_events.append(transformed_event)
+            
+            # Upload events one at a time with retry logic
+            successful_upserts = 0
+            failed_upserts = 0
+            
+            for event in transformed_events:
                 if self.upload_event_with_retry(event, url):
                     successful_upserts += 1
                 else:
-                    failed_events.append(event)
+                    failed_upserts += 1
+                    self.logger.error(f"Failed to upload event after retries: {event.get('title', 'Unknown')}")
             
             result = {
+                "totalEvents": len(events),
                 "successfulUpserts": successful_upserts,
-                "totalEvents": total_events,
-                "failedEvents": failed_events
+                "failedUpserts": failed_upserts
             }
-            self.logger.info(f"Upload completed: {successful_upserts}/{total_events} successful")
+            
+            self.logger.info(f"Upload completed: {successful_upserts}/{len(events)} successful, {failed_upserts} failed")
             return result
             
         except requests.exceptions.RequestException as e:
@@ -132,14 +148,38 @@ class VectorApiClient:
 
     def upload_event_with_retry(self, event, url, max_retries=3, backoff=2):
         for attempt in range(max_retries):
-            response = requests.post(url, json={"events": [event]})
-            if response.status_code == 200:
-                return True
-            elif response.status_code == 429:
-                retry_after = int(response.headers.get("Retry-After", backoff))
-                time.sleep(retry_after)
-            else:
-                break
+            try:
+                response = requests.post(url, json={"events": [event]})
+                if response.status_code == 200:
+                    result = response.json()
+                    successful_upserts = result.get("successfulUpserts", 0)
+                    failed_upserts = result.get("failedUpserts", 0)
+                    total_events = result.get("totalEvents", 0)
+                    upserted_ids = result.get("upsertedIds", [])
+                    
+                    # Only log if there are failed upserts
+                    if failed_upserts > 0:
+                        self.logger.warning(f"Event '{event.get('title', 'Unknown')}': {successful_upserts} successful upserts, {failed_upserts} failed upserts out of {total_events} total events. Upserted IDs: {upserted_ids}")
+                    
+                    # Consider it a success if we have any successful upserts OR if we have upserted IDs
+                    if successful_upserts > 0 or len(upserted_ids) > 0:
+                        return True
+                    
+                    # Only log warning if we actually got 0 successful upserts and some failed upserts
+                    if successful_upserts == 0 and failed_upserts > 0:
+                        self.logger.warning(f"Event upload returned 200 but no successful upserts: {result}")
+                elif response.status_code == 429:
+                    retry_after = int(response.headers.get("Retry-After", backoff))
+                    self.logger.debug(f"Rate limited, waiting {retry_after} seconds")
+                    time.sleep(retry_after)
+                else:
+                    self.logger.error(f"Failed to upload event (attempt {attempt + 1}/{max_retries}): {response.status_code} - {response.text}")
+                    break
+            except Exception as e:
+                self.logger.error(f"Error during upload attempt {attempt + 1}: {str(e)}")
+                if attempt == max_retries - 1:
+                    break
+                time.sleep(backoff)
         return False
 
     def get_event_count(self, container: Optional[str] = None) -> int:

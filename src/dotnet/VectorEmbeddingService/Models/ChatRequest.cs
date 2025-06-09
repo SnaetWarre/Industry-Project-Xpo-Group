@@ -9,4 +9,6 @@ public class ChatRequest
     // The target event dataset (e.g., 'ffd', 'artisan', 'abiss')
     [JsonPropertyName("website")]
     public string Website { get; set; } = "ffd";
+    [JsonPropertyName("sessionId")]
+    public string? SessionId { get; set; }
 } 

@@ -1,12 +1,46 @@
 using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "VectorEmbeddingService", Version = "v1" });
+    options.SwaggerDoc("dashboard", new OpenApiInfo { Title = "Dashboard", Version = "v1" });
+
+    // Add JWT Bearer
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
+    };
+    options.AddSecurityDefinition("Bearer", securityScheme);
+
+    var securityRequirement = new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    };
+    options.AddSecurityRequirement(securityRequirement);
+});
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -21,7 +55,8 @@ builder.Services.AddCors(options =>
             "http://127.0.0.1:5500"
         )
         .AllowAnyMethod()
-        .AllowAnyHeader();
+        .AllowAnyHeader()
+        .AllowCredentials();
     });
 });
 
@@ -54,6 +89,30 @@ builder.Services.AddLogging(logging =>
     logging.AddDebug();
 });
 
+// Add JWT authentication, but do not require globally
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    var config = builder.Configuration;
+    var key = config["Jwt:Key"] ?? "supersecretkey1234567890";
+    var issuer = config["Jwt:Issuer"] ?? "VectorEmbeddingService";
+    var audience = config["Jwt:Audience"] ?? "DashboardUsers";
+    options.TokenValidationParameters = new()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(key))
+    };
+});
+
 var app = builder.Build();
 
 // Add CORS before anything else that handles requests!
@@ -62,36 +121,19 @@ app.UseCors("AllowSpecificOrigins");
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
+        options.SwaggerEndpoint("/swagger/dashboard/swagger.json", "Dashboard");
+    });
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication(); // Only needed for [Authorize] controllers
 app.UseAuthorization();
 app.MapControllers();
 
-// Initialize CosmosDB database and container if they don't exist
-await InitializeCosmosDbAsync(app.Services);
+Console.WriteLine("export ASPNETCORE_ENVIRONMENT=Development");
+Console.WriteLine("voer bovenstaande commmando uit in je terminal voor swagger te kunnen gebruiken");
 
 app.Run();
-
-static async Task InitializeCosmosDbAsync(IServiceProvider services)
-{
-    using var scope = services.CreateScope();
-    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var cosmosClient = scope.ServiceProvider.GetRequiredService<CosmosClient>();
-
-    try
-    {
-        var databaseName = configuration["CosmosDb:DatabaseName"] ?? throw new ArgumentNullException("CosmosDb:DatabaseName");
-
-        // Create database if it doesn't exist
-        var databaseResponse = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
-        logger.LogInformation("Database '{DatabaseName}' ready", databaseName);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Error initializing CosmosDB");
-        throw;
-    }
-} 

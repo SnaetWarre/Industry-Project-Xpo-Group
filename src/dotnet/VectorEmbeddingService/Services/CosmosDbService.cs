@@ -2,6 +2,12 @@ using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Models;
 using System.Net;
 using System.Linq;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Globalization;
 
 namespace VectorEmbeddingService.Services;
 
@@ -21,6 +27,28 @@ public class CosmosDbService : ICosmosDbService
         _container = cosmosClient.GetContainer(databaseName, containerName);
         _embeddingService = embeddingService;
         _logger = logger;
+    }
+
+    private static float SafeToFloat(object? x)
+    {
+        if (x == null) return 0f;
+        if (x is float f) return f;
+        if (x is double d) return (float)d;
+        if (x is int i) return i;
+        if (x is long l) return l;
+        if (x is decimal m) return (float)m;
+        if (x is string s && float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var result)) return result;
+        var type = x.GetType();
+        if (type.FullName == "Newtonsoft.Json.Linq.JValue")
+        {
+            var valueProp = type.GetProperty("Value");
+            if (valueProp != null)
+            {
+                var value = valueProp.GetValue(x);
+                return SafeToFloat(value);
+            }
+        }
+        try { return Convert.ToSingle(x, CultureInfo.InvariantCulture); } catch { return 0f; }
     }
 
     public async Task<string> UpsertEventAsync(EventDocument eventDocument)
@@ -84,27 +112,54 @@ public class CosmosDbService : ICosmosDbService
         return upsertedIds;
     }
 
+    // Use projection queries to fetch only the fields needed for similarity search and result formatting
     public async Task<List<EventDocument>> SearchSimilarEventsAsync(float[] queryEmbedding, int topK = 5, double threshold = 0.7)
     {
         try
         {
-            // Get all events with embeddings
-            var query = "SELECT * FROM c WHERE IS_DEFINED(c.embedding) AND ARRAY_LENGTH(c.embedding) > 0";
+            // Only select the fields we need for similarity and result formatting
+            var query = @"SELECT c.id, c.title, c.description, c.url, c.socialMediaLinks, c.standNumbers, c.rawTextContent, c.sourceType, c.embedding, c.embeddingText, c.createdAt, c.updatedAt FROM c WHERE IS_DEFINED(c.embedding) AND ARRAY_LENGTH(c.embedding) > 0";
             var queryDefinition = new QueryDefinition(query);
-            
             var events = new List<EventDocument>();
-            using var feedIterator = _container.GetItemQueryIterator<EventDocument>(queryDefinition);
-            
+            using var feedIterator = _container.GetItemQueryIterator<dynamic>(queryDefinition);
             while (feedIterator.HasMoreResults)
             {
                 var response = await feedIterator.ReadNextAsync();
-                events.AddRange(response);
+                foreach (var item in response)
+                {
+                    events.Add(new EventDocument
+                    {
+                        Id = item.id,
+                        Title = item.title,
+                        Description = item.description,
+                        Url = item.url,
+                        SocialMediaLinks = item.socialMediaLinks != null
+                            ? ((IEnumerable<object>)item.socialMediaLinks)
+                                .Where(x => x != null)
+                                .Select(x => x.ToString()!)
+                                .Cast<string>()
+                                .ToList()
+                            : new List<string>(),   
+                        StandNumbers = item.standNumbers != null
+                            ? ((IEnumerable<object>)item.standNumbers)
+                                .Where(x => x != null)
+                                .Select(x => x.ToString()!)
+                                .Cast<string>()
+                                .ToList()
+                            : new List<string>(),
+                        RawTextContent = item.rawTextContent,
+                        SourceType = item.sourceType,
+                        Embedding = ((IEnumerable<object>)item.embedding).Select(x => SafeToFloat(x)).ToArray(),
+                        EmbeddingText = item.embeddingText,
+                        CreatedAt = item.createdAt != null ? (DateTime)item.createdAt : DateTime.MinValue,
+                        UpdatedAt = item.updatedAt != null ? (DateTime)item.updatedAt : DateTime.MinValue
+                    });
+                }
             }
 
-            // Calculate similarities and filter
-            var similarEvents = new List<(EventDocument Event, double Similarity)>();
-
-            foreach (var eventDoc in events)
+            // Calculate similarities and filter in parallel
+            var similarEvents = new ConcurrentBag<(EventDocument Event, double Similarity)>();
+            Parallel.ForEach(events, eventDoc =>
             {
                 if (eventDoc.Embedding?.Length > 0)
                 {
@@ -114,7 +169,7 @@ public class CosmosDbService : ICosmosDbService
                         similarEvents.Add((eventDoc, similarity));
                     }
                 }
-            }
+            });
 
             // Sort by similarity and take top K
             var topEvents = similarEvents
@@ -153,22 +208,43 @@ public class CosmosDbService : ICosmosDbService
         }
     }
 
+    // Use projection queries for GetAllEventsAsync as well
     public async Task<List<EventDocument>> GetAllEventsAsync()
     {
         try
         {
-            var query = "SELECT * FROM c WHERE IS_DEFINED(c.title)";
+            var query = @"SELECT c.id, c.title, c.description, c.url, c.socialMediaLinks, c.standNumbers, c.rawTextContent, c.sourceType, c.embedding, c.embeddingText, c.createdAt, c.updatedAt FROM c WHERE IS_DEFINED(c.title)";
             var queryDefinition = new QueryDefinition(query);
-            
             var events = new List<EventDocument>();
-            using var feedIterator = _container.GetItemQueryIterator<EventDocument>(queryDefinition);
-            
+            using var feedIterator = _container.GetItemQueryIterator<dynamic>(queryDefinition);
             while (feedIterator.HasMoreResults)
             {
                 var response = await feedIterator.ReadNextAsync();
-                events.AddRange(response);
+                foreach (var item in response)
+                {
+                    events.Add(new EventDocument
+                    {
+                        Id = item.id,
+                        Title = item.title,
+                        Description = item.description,
+                        Url = item.url,
+                        SocialMediaLinks = item.socialMediaLinks != null
+                            ? ((IEnumerable<object>)item.socialMediaLinks)
+                                .Where(x => x != null)
+                                .Select(x => x.ToString()!)
+                                .Cast<string>()
+                                .ToList()
+                            : new List<string>(),
+                        StandNumbers = item.standNumbers != null ? ((IEnumerable<object>)item.standNumbers).Where(x => x != null).Select(x => x.ToString()!).ToList() : new List<string>(),
+                        RawTextContent = item.rawTextContent,
+                        SourceType = item.sourceType,
+                        Embedding = item.embedding != null ? ((IEnumerable<object>)item.embedding).Where(x => x != null).Select(x => SafeToFloat(x)).ToArray() : Array.Empty<float>(),
+                        EmbeddingText = item.embeddingText,
+                        CreatedAt = item.createdAt != null ? (DateTime)item.createdAt : DateTime.MinValue,
+                        UpdatedAt = item.updatedAt != null ? (DateTime)item.updatedAt : DateTime.MinValue
+                    });
+                }
             }
-
             return events;
         }
         catch (Exception ex)

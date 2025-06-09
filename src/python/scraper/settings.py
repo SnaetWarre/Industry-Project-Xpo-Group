@@ -6,7 +6,7 @@ NEWSPIDER_MODULE = "src.python.scraper.spiders"
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
 
-# Obey robots.txt rules
+# Obey robots.txt rules because it is our own website...
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)

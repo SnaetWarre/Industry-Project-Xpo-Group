@@ -24,7 +24,7 @@ class EventSiteSpider(scrapy.Spider):
         "FEED_EXPORT_ENCODING": "utf-8",
         "DEPTH_LIMIT": 0,
         "LOG_LEVEL": "INFO",
-        "USER_AGENT": "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0",
+        "USER_AGENT": "KortrijkXpoBot/1.0 (+https://www.kortrijkxpo.com; bot@kortrijkxpo.com)",
         "ROBOTSTXT_OBEY": False,
     }
 
