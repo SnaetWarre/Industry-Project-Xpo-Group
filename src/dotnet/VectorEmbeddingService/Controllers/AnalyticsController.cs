@@ -103,16 +103,20 @@ public class AnalyticsController : ControllerBase
             // Initialize or update session data
             if (!daily.SessionData.TryGetValue(sessionId, out var sessionData))
             {
-                // Only create a new sessionData for chat_start, not for registration
-                if (analyticsEvent.EventType == "chat_start")
+                // Always create a new sessionData for chat_start or registration
+                sessionData = new SessionData
                 {
-                    sessionData = new SessionData
-                    {
-                        ChatStartTime = now,
-                        Company = company
-                    };
-                    daily.SessionData[sessionId] = sessionData;
-                }
+                    ChatStartTime = now,
+                    Company = company
+                };
+                daily.SessionData[sessionId] = sessionData;
+            }
+
+            // Update session data for chat_start
+            if (analyticsEvent.EventType == "chat_start")
+            {
+                sessionData.ChatStartTime = now;
+                sessionData.Company = company;
             }
 
             // Handle registration click event
@@ -126,14 +130,15 @@ public class AnalyticsController : ControllerBase
                         daily.CompanyStats[company] = 0;
                     daily.CompanyStats[company]++;
                 }
-                // If you want to track chat-to-registration time, keep the sessionData logic as is
-                if (sessionData != null)
+                // Always update sessionData for registration
+                sessionData.RegistrationClickTime = now;
+                if (sessionData.ChatStartTime != default)
                 {
-                    sessionData.RegistrationClickTime = now;
-                    if (sessionData.ChatStartTime != default)
-                    {
-                        sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
-                    }
+                    sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
+                }
+                else
+                {
+                    sessionData.ChatToRegistrationSeconds = 0;
                 }
             }
 
