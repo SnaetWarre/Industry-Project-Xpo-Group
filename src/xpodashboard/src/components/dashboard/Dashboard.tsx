@@ -4,6 +4,8 @@ import { MousePointerClick, Users, TrendingUp, Download, ArrowUpRight } from 'lu
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import ApiService from '@/services/api';
 
 const siteNames = ['ffd', 'abiss', 'artisan']
 
@@ -54,37 +56,13 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+interface OverviewData {
+  registrationClicks: number;
+  users: number;
+  conversionRate: number;
+}
+
 const Dashboard = () => {
-  
-  const [registratieKliks, setRegistratieKliks] = useState(null);
-
-  useEffect(() => {
-    async function fetchKliks() {
-      try {
-        // Maak een array van fetch-promises aan voor elke site
-        const fetchPromises = siteNames.map(site =>
-          fetch(`http://localhost:5000/api/${site}/count`)
-            .then(response => response.json())
-            .then(data => data.count)
-        );
-
-        // Wacht tot alle fetches klaar zijn
-        const counts = await Promise.all(fetchPromises);
-
-        // Bereken de som van alle counts
-        const total_kliks = counts.reduce((acc, curr) => acc + curr, 0);
-
-        setRegistratieKliks(total_kliks);
-      } catch (error) {
-        console.error('Error fetching registratie kliks:', error);
-      }
-    }
-    fetchKliks();
-  }
-  , []);
-
-
-
   return (
     <div>
       <h1 className="text-3xl font-bold text-black mb-6">Dashboard</h1>
@@ -95,15 +73,11 @@ const Dashboard = () => {
           <div className='text-black'>
             <p className="text-sm text-gray-500">Aantal registratie kliks</p>
             <div className="flex items-center gap-3 mt-1">
-              <p className="text-2xl font-bold">{registratieKliks !== null ? registratieKliks : '...'}</p>
+              <p className="text-2xl font-bold">220</p>
               <div className="bg-amber-50 p-3 rounded-full">
                 <MousePointerClick className="h-6 w-6 text-amber-500" />
               </div>
             </div>
-          </div>
-          <div className="flex items-center mt-4">
-            <span className="text-emerald-500 text-sm">↑ 8.5%</span>
-            <span className="text-gray-500 text-sm ml-1">Stijging t.o.v. gisteren</span>
           </div>
         </div>
 
@@ -112,15 +86,11 @@ const Dashboard = () => {
           <div className='text-black'>
             <p className="text-sm text-gray-500">Aantal gebruikers</p>
             <div className="flex items-center gap-3 mt-1">
-              <p className="text-2xl font-bold">12</p>
+              <p className="text-2xl font-bold">{overviewData.users}</p>
               <div className="bg-violet-50 p-3 rounded-full">
                 <Users className="h-6 w-6 text-violet-500" />
               </div>
             </div>
-          </div>
-          <div className="flex items-center mt-4">
-            <span className="text-emerald-500 text-sm">↑ 1.3%</span>
-            <span className="text-gray-500 text-sm ml-1">Stijging t.o.v. vorige week</span>
           </div>
         </div>
 
@@ -129,15 +99,11 @@ const Dashboard = () => {
           <div className='text-black'>
             <p className="text-sm text-gray-500">Conversiepercentage</p>
             <div className="flex items-center gap-3 mt-1">
-              <p className="text-2xl font-bold">14%</p>
+              <p className="text-2xl font-bold">{(overviewData.conversionRate * 100).toFixed(1)}%</p>
               <div className="bg-emerald-50 p-3 rounded-full">
                 <TrendingUp className="h-6 w-6 text-emerald-500" />
               </div>
             </div>
-          </div>
-          <div className="flex items-center mt-4">
-            <span className="text-rose-500 text-sm">↓ 4.3%</span>
-            <span className="text-gray-500 text-sm ml-1">Daling t.o.v. gisteren</span>
           </div>
         </div>
       </div>
