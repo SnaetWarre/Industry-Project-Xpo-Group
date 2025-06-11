@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/providers/AuthProvider';
+import ApiService from '@/lib/services/apiService';
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
@@ -13,29 +15,18 @@ export default function SignIn() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { setToken } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      // Use full backend URL for cross-origin request
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password }),
-        credentials: 'include', // Required for cookies from backend
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setError(data?.message || 'Inloggen mislukt. Controleer je gegevens.');
-        setLoading(false);
-        return;
-      }
-      // On success, redirect to dashboard
+      const response = await ApiService.login(email, password);
+      setToken(response.token);
       router.push('/dashboard');
     } catch (err) {
-      setError('Er is een fout opgetreden. Probeer het opnieuw.');
+      setError('Invalid username or password');
       setLoading(false);
     }
   };
