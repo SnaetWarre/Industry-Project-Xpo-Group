@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = 'https://localhost:5001';
 
 interface LoginResponse {
   token: string;
@@ -15,13 +15,13 @@ interface OverviewData {
 class ApiService {
   private static token: string | null = null;
 
-  private static async getToken(): Promise<string> {
+  public static async getToken(username: string, password: string): Promise<string> {
     if (this.token) return this.token;
 
     try {
       const response = await axios.post<LoginResponse>(`${API_URL}/api/auth/login`, {
-        username: process.env.NEXT_PUBLIC_API_USERNAME,
-        password: process.env.NEXT_PUBLIC_API_PASSWORD,
+        username,
+        password,
       });
 
       if (!response.data.token) {
@@ -37,7 +37,7 @@ class ApiService {
   }
 
   private static async getHeaders() {
-    const token = await this.getToken();
+    const token = await this.getToken(process.env.NEXT_PUBLIC_API_USERNAME!, process.env.NEXT_PUBLIC_API_PASSWORD!);
     return {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',

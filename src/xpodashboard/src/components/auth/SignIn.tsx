@@ -4,26 +4,23 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/providers/AuthProvider';
-import ApiService from '@/lib/services/apiService';
+import ApiService from '@/services/api';
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { setToken } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const response = await ApiService.login(email, password);
-      setToken(response.token);
+      await ApiService.getToken(username, password);
       router.push('/dashboard');
     } catch (err) {
       setError('Invalid username or password');
@@ -53,16 +50,16 @@ export default function SignIn() {
               <div className="text-red-600 text-sm mb-2">{error}</div>
             )}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-[#344054] mb-1.5">
-                E-mailadres*
+              <label htmlFor="username" className="block text-sm font-medium text-[#344054] mb-1.5">
+                Gebruikersnaam*
               </label>
               <input
-                type="email"
-                id="email"
-                placeholder="E-mailadres"
+                type="text"
+                id="username"
+                placeholder="Gebruikersnaam"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-black placeholder-neutral-500"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
             </div>
 
