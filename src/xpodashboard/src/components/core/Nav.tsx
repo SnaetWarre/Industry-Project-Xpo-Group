@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, LayoutDashboard, MessageSquare } from 'lucide-react';
 
 interface NavProps {
   children: React.ReactNode;
@@ -35,6 +35,7 @@ const Nav = ({ children }: NavProps) => {
                   : 'text-gray-700 hover:bg-red-10/10'
               }`}
             >
+              <LayoutDashboard className="h-5 w-5 mr-3" />
               Dashboard
             </Link>
             <Link 
@@ -45,6 +46,7 @@ const Nav = ({ children }: NavProps) => {
                   : 'text-gray-700 hover:bg-red-10/10'
               }`}
             >
+              <MessageSquare className="h-5 w-5 mr-3" />
               Chatgeschiedenis
             </Link>
           </nav>
