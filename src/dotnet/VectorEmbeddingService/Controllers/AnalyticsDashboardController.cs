@@ -190,7 +190,6 @@ public class AnalyticsDashboardController : ControllerBase
         {
             u.Company,
             u.JobTitle,
-            u.CompanyDescription,
             u.CreatedAt
         });
         return Ok(result);

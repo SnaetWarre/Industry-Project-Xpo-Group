@@ -232,16 +232,12 @@ public class AnalyticsController : ControllerBase
             if (string.IsNullOrEmpty(request.JobTitle))
                 return BadRequest("JobTitle is required");
 
-            if (string.IsNullOrEmpty(request.CompanyDescription))
-                return BadRequest("CompanyDescription is required");
-
             var profile = new UserProfile
             {
                 Id = Guid.NewGuid().ToString(),
                 SessionId = sessionId,
                 Company = request.Company,
                 JobTitle = request.JobTitle,
-                CompanyDescription = request.CompanyDescription,
                 Website = request.Website,
                 ChatHistory = new List<ChatMessage>(),
                 CreatedAt = DateTime.UtcNow,
