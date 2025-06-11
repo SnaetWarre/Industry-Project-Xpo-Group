@@ -16,9 +16,6 @@ public class UserProfile
     [JsonPropertyName("jobTitle")]
     public string JobTitle { get; set; } = string.Empty;
 
-    [JsonPropertyName("companyDescription")]
-    public string CompanyDescription { get; set; } = string.Empty;
-
     [JsonPropertyName("chatHistory")]
     public List<ChatMessage> ChatHistory { get; set; } = new();
 
