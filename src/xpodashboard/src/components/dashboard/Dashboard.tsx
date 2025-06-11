@@ -5,6 +5,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+const siteNames = ['ffd', 'abiss', 'artisan']
+
 // Voorbeeld data met alle dagen van oktober
 const chartData = [
   { date: '01/10', clicks: 145 },
@@ -59,9 +61,20 @@ const Dashboard = () => {
   useEffect(() => {
     async function fetchKliks() {
       try {
-        const response = await fetch('http://localhost:5000/api/abiss/count');
-        const data = await response.json();
-        setRegistratieKliks(data.count);
+        // Maak een array van fetch-promises aan voor elke site
+        const fetchPromises = siteNames.map(site =>
+          fetch(`http://localhost:5000/api/${site}/count`)
+            .then(response => response.json())
+            .then(data => data.count)
+        );
+
+        // Wacht tot alle fetches klaar zijn
+        const counts = await Promise.all(fetchPromises);
+
+        // Bereken de som van alle counts
+        const total_kliks = counts.reduce((acc, curr) => acc + curr, 0);
+
+        setRegistratieKliks(total_kliks);
       } catch (error) {
         console.error('Error fetching registratie kliks:', error);
       }
