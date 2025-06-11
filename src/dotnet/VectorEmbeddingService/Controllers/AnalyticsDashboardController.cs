@@ -188,12 +188,26 @@ public class AnalyticsDashboardController : ControllerBase
         }
         var result = users.Select(u => new
         {
-            u.Company,
-            u.JobTitle,
-            u.CompanyDescription,
+            ProfileInfo = u.ProfileInfo,
             u.CreatedAt
         });
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Get chat history for a user by sessionId.
+    /// </summary>
+    [HttpGet("chat-history/{sessionId}")]
+    public async Task<IActionResult> GetChatHistory(string sessionId)
+    {
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.sessionId = @sessionId")
+            .WithParameter("@sessionId", sessionId);
+        var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(query);
+        var results = await iterator.ReadNextAsync();
+        var profile = results.FirstOrDefault();
+        if (profile == null)
+            return NotFound("User profile not found");
+        return Ok(profile.ChatHistory);
     }
 
     /// <summary>

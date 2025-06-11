@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace VectorEmbeddingService.Controllers;
 
 [ApiController]
-[Route("api/analytics")]
+[Route("api/metrics")]
 public class AnalyticsController : ControllerBase
 {
     private readonly Container _analyticsContainer;
@@ -50,7 +50,7 @@ public class AnalyticsController : ControllerBase
                 _logger.LogWarning("Analytics event received for missing profile. SessionId: {SessionId}, EventType: {EventType}", sessionId, analyticsEvent.EventType);
                 return StatusCode(440, new { success = false, error = "SessionInvalid", message = "User profile/session not found. Please re-register." });
             }
-            string company = profile.Company ?? "unknown";
+            string company = profile.ProfileInfo ?? "unknown";
             string website = profile.Website ?? "unknown";
 
             // Do not create analytics documents for unknown websites
@@ -103,16 +103,20 @@ public class AnalyticsController : ControllerBase
             // Initialize or update session data
             if (!daily.SessionData.TryGetValue(sessionId, out var sessionData))
             {
-                // Only create a new sessionData for chat_start, not for registration
-                if (analyticsEvent.EventType == "chat_start")
+                // Always create a new sessionData for chat_start or registration
+                sessionData = new SessionData
                 {
-                    sessionData = new SessionData
-                    {
-                        ChatStartTime = now,
-                        Company = company
-                    };
-                    daily.SessionData[sessionId] = sessionData;
-                }
+                    ChatStartTime = now,
+                    Company = company
+                };
+                daily.SessionData[sessionId] = sessionData;
+            }
+
+            // Update session data for chat_start
+            if (analyticsEvent.EventType == "chat_start")
+            {
+                sessionData.ChatStartTime = now;
+                sessionData.Company = company;
             }
 
             // Handle registration click event
@@ -126,14 +130,15 @@ public class AnalyticsController : ControllerBase
                         daily.CompanyStats[company] = 0;
                     daily.CompanyStats[company]++;
                 }
-                // If you want to track chat-to-registration time, keep the sessionData logic as is
-                if (sessionData != null)
+                // Always update sessionData for registration
+                sessionData.RegistrationClickTime = now;
+                if (sessionData.ChatStartTime != default)
                 {
-                    sessionData.RegistrationClickTime = now;
-                    if (sessionData.ChatStartTime != default)
-                    {
-                        sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
-                    }
+                    sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
+                }
+                else
+                {
+                    sessionData.ChatToRegistrationSeconds = 0;
                 }
             }
 
@@ -226,22 +231,14 @@ public class AnalyticsController : ControllerBase
             if (string.IsNullOrEmpty(sessionId))
                 return BadRequest("SessionId is required");
 
-            if (string.IsNullOrEmpty(request.Company))
-                return BadRequest("Company is required");
-
-            if (string.IsNullOrEmpty(request.JobTitle))
-                return BadRequest("JobTitle is required");
-
-            if (string.IsNullOrEmpty(request.CompanyDescription))
-                return BadRequest("CompanyDescription is required");
+            if (string.IsNullOrEmpty(request.ProfileInfo))
+                return BadRequest("ProfileInfo is required");
 
             var profile = new UserProfile
             {
                 Id = Guid.NewGuid().ToString(),
                 SessionId = sessionId,
-                Company = request.Company,
-                JobTitle = request.JobTitle,
-                CompanyDescription = request.CompanyDescription,
+                ProfileInfo = request.ProfileInfo,
                 Website = request.Website,
                 ChatHistory = new List<ChatMessage>(),
                 CreatedAt = DateTime.UtcNow,
