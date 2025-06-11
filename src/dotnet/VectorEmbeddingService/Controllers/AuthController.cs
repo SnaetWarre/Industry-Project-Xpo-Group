@@ -37,6 +37,20 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid username or password");
 
         var token = GenerateJwtToken(request.Username);
+
+        // Set JWT as HTTP-only cookie
+        Response.Cookies.Append(
+            "jwt",
+            token,
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false, // Set to true in production (requires HTTPS)
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddHours(24)
+            }
+        );
+
         return Ok(new { token });
     }
 
@@ -45,7 +59,7 @@ public class AuthController : ControllerBase
         var key = _configuration["Jwt:Key"] ?? "supersecretkey1234567890";
         var issuer = _configuration["Jwt:Issuer"] ?? "VectorEmbeddingService";
         var audience = _configuration["Jwt:Audience"] ?? "DashboardUsers";
-        var expires = DateTime.UtcNow.AddHours(8);
+        var expires = DateTime.UtcNow.AddHours(24);
 
         var claims = new[]
         {
