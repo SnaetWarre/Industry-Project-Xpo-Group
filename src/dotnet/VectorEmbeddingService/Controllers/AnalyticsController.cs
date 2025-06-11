@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace VectorEmbeddingService.Controllers;
 
 [ApiController]
-[Route("api/analytics")]
+[Route("api/metrics")]
 public class AnalyticsController : ControllerBase
 {
     private readonly Container _analyticsContainer;
@@ -50,7 +50,7 @@ public class AnalyticsController : ControllerBase
                 _logger.LogWarning("Analytics event received for missing profile. SessionId: {SessionId}, EventType: {EventType}", sessionId, analyticsEvent.EventType);
                 return StatusCode(440, new { success = false, error = "SessionInvalid", message = "User profile/session not found. Please re-register." });
             }
-            string company = profile.Company ?? "unknown";
+            string company = profile.ProfileInfo ?? "unknown";
             string website = profile.Website ?? "unknown";
 
             // Do not create analytics documents for unknown websites
@@ -231,18 +231,14 @@ public class AnalyticsController : ControllerBase
             if (string.IsNullOrEmpty(sessionId))
                 return BadRequest("SessionId is required");
 
-            if (string.IsNullOrEmpty(request.Company))
-                return BadRequest("Company is required");
-
-            if (string.IsNullOrEmpty(request.JobTitle))
-                return BadRequest("JobTitle is required");
+            if (string.IsNullOrEmpty(request.ProfileInfo))
+                return BadRequest("ProfileInfo is required");
 
             var profile = new UserProfile
             {
                 Id = Guid.NewGuid().ToString(),
                 SessionId = sessionId,
-                Company = request.Company,
-                JobTitle = request.JobTitle,
+                ProfileInfo = request.ProfileInfo,
                 Website = request.Website,
                 ChatHistory = new List<ChatMessage>(),
                 CreatedAt = DateTime.UtcNow,

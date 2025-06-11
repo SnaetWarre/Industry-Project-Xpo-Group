@@ -188,8 +188,7 @@ public class AnalyticsDashboardController : ControllerBase
         }
         var result = users.Select(u => new
         {
-            u.Company,
-            u.JobTitle,
+            ProfileInfo = u.ProfileInfo,
             u.CreatedAt
         });
         return Ok(result);

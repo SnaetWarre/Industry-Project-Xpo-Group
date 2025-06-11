@@ -17,17 +17,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Website specific configurations
   const websiteConfig = {
     abiss: {
-      botName: 'AbissBot',
+      botName: 'AI-beursassistent',
       welcomeMessage:
         'Hoi! Ik ben je digitale beursassistent voor ABISS. Ik kan je helpen met informatie over digitalisering, automatisering, Industry of Things, Intelligence of Things en Security of Things. Waar ben je naar op zoek?',
     },
     ffd: {
-      botName: 'FLORBot',
+      botName: 'AI-beursassistent',
       welcomeMessage:
         'Hoi! Ik ben je beursassistent voor de vloeren- en isolatiebeurs. Ik kan je helpen met informatie over vloeren, isolatie en gerelateerde producten. Waar ben je naar op zoek?',
     },
     artisan: {
-      botName: 'ArtisanBot',
+      botName: 'AI-beursassistent',
       welcomeMessage:
         'Hoi! Ik ben je beursassistent voor artisanale en ambachtelijke producten. Ik kan je helpen met informatie over voedsel, dranken en andere ambachtelijke producten. Waar ben je naar op zoek?',
     },
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // API endpoint configuration
-  const API_URL = 'http://localhost:5000';
+  const API_URL = 'https://localhost:5001';
 
   // Helper to set and get sessionId cookie
   function setSessionIdCookie(sessionId) {
@@ -84,81 +84,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.cookie = 'chatbotSessionId=; Max-Age=0; path=/; SameSite=Lax';
   }
 
-  // Show registration form
-  function showRegistrationForm() {
-    const formHtml = `
-      <div class="registration-form" style="box-sizing: border-box; width: 100%; max-width: 340px; margin-left: auto; margin-right: auto; overflow: visible;">
-        <h3>Expo registratie</h3>
-        <form id="registrationForm" style="box-sizing: border-box; width: 100%;">
-          <div class="form-group">
-            <label for="company">Bedrijfsnaam</label>
-            <input type="text" id="company" name="company" placeholder="Jouw bedrijf" required autocomplete="organization">
-          </div>
-          <div class="form-group">
-            <label for="jobTitle">Functietitel</label>
-            <input type="text" id="jobTitle" name="jobTitle" placeholder="Jouw functie" required autocomplete="job-title">
-          </div>
-          <div class="form-group privacy-disclaimer">
-            <small>
-              Door op 'Registreer en start chat' te klikken, <span class="disclaimer-bold">ga je akkoord</span> met onze
-              <a href="Eerste%20gesprek%20met%20klant_%2019_05.pdf" target="_blank" class="privacy-link">Privacyverklaring</a>.
-            </small>
-          </div>
-          <button type="submit" class="register-main-btn">Registreer en start chat</button>
-        </form>
-      </div>
-    `;
-    messages.innerHTML = formHtml;
-    form.style.display = 'none';
-    windowEl.style.overflowX = 'hidden';
-    messages.style.overflowX = 'hidden';
-    addResizeHandles();
-    document
-      .getElementById('registrationForm')
-      .addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const formData = {
-          company: document.getElementById('company').value,
-          jobTitle: document.getElementById('jobTitle').value,
-        };
-        // Always get a new sessionId from backend for a new registration
-        const response = await fetch(`${API_URL}/api/analytics/session`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (!response.ok)
-          throw new Error('Failed to get sessionId from backend');
-        const data = await response.json();
-        setSessionIdCookie(data.sessionId);
-        await createUserProfile(data.sessionId, formData, websiteId);
-        await trackAnalyticsEvent('chat_start', {
-          ...formData,
-          sessionId: data.sessionId,
-        });
-        await trackAnalyticsEvent('form_submission', {
-          ...formData,
-          sessionId: data.sessionId,
-        });
-        initializeWebsite();
-        form.style.display = '';
-      });
-  }
+  // Nieuwe registratie/chatflow
+  let registrationStep = true;
 
-  async function createUserProfile(sessionId, formData, websiteIdArg) {
+  async function createUserProfile(sessionId, profileInfo, websiteIdArg) {
     try {
-      console.log(
-        'createUserProfile payload website:',
-        websiteIdArg,
-        'sessionId:',
-        sessionId
-      );
-      const response = await fetch(`${API_URL}/api/analytics/profile`, {
+      const response = await fetch(`${API_URL}/api/metrics/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: sessionId,
-          company: formData.company,
-          jobTitle: formData.jobTitle,
+          profileInfo: profileInfo,
           website: websiteIdArg,
         }),
       });
@@ -171,37 +107,120 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Initialize website configuration
   async function initializeWebsite() {
     const config = websiteConfig[websiteId];
-    if (!(await hasRegistered())) {
-      showRegistrationForm();
+    headerTitle.textContent = config.botName;
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('nl-NL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    messages.innerHTML = `
+      <div class="bot-message-container">
+        <img src="images/robot.svg" alt="Bot">
+        <div class="message-wrapper">
+          <div class="bot-name">${config.botName}</div>
+          <div class="chatbot-bubble">
+            Hoi! Ik ben je AI-beursassistent, ik kan je gepersonaliseerde informatie bezorgen over het event. Wat is jouw functietitel en bedrijfsnaam?
+          </div>
+          <div class="timestamp">${timeString}</div>
+        </div>
+      </div>
+      <div class="privacy-link-container" style="text-align:right;margin-top:8px;">
+        <a href="gdpr.pdf" target="_blank" class="privacy-link" style="font-size:12px;opacity:0.7;">Privacyverklaring</a>
+      </div>
+    `;
+    form.style.display = '';
+    registrationStep = true;
+    allMessages = [];
+    lastRenderedScrollToBottom = true;
+  }
+
+  // Pas form.onsubmit aan voor registratieflow
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    const sendingMsg = {
+      text,
+      isUser: true,
+      timestamp: new Date(),
+      sending: true,
+    };
+    allMessages.push(sendingMsg);
+    lastRenderedScrollToBottom = true;
+    renderMessages();
+    input.value = '';
+    input.disabled = true;
+    const sessionId = getSessionIdCookie();
+    if (registrationStep) {
+      // Eerste user input = profielinfo
+      let sid = sessionId;
+      if (!sid) {
+        // Genereer nieuwe sessie
+        const response = await fetch(`${API_URL}/api/metrics/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error('Failed to get sessionId from backend');
+        const data = await response.json();
+        setSessionIdCookie(data.sessionId);
+        sid = data.sessionId;
+      }
+      await createUserProfile(sid, text, websiteId);
+      allMessages = allMessages.filter((m) => !m.sending);
+      addMessage(text, true);
+      // Bot antwoordt met vervolgvraag
+      setTimeout(() => {
+        addMessage('Bedankt voor jouw interesse! Waar ben je precies naar op zoek?');
+      }, 400);
+      registrationStep = false;
+      input.disabled = false;
+      input.focus();
       return;
     }
-    if (config) {
-      headerTitle.textContent = config.botName;
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('nl-NL', {
-        hour: '2-digit',
-        minute: '2-digit',
+    // Normale chatflow na registratie
+    await trackChatMessage(text, true);
+    showTypingIndicator();
+    try {
+      const response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, website: websiteId, sessionId }),
       });
-      messages.innerHTML = `
-        <div class="bot-message-container">
-          <img src="images/robot.svg" alt="Bot">
-          <div class="message-wrapper">
-            <div class="bot-name">${config.botName}</div>
-            <div class="chatbot-bubble">
-              ${config.welcomeMessage}
-            </div>
-            <div class="timestamp">${timeString}</div>
-          </div>
-        </div>
-      `;
-      form.style.display = '';
-    } else {
-      console.error(`Website configuration not found for ID: ${websiteId}`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      hideTypingIndicator();
+      allMessages = allMessages.filter((m) => !m.sending);
+      addMessage(text, true);
+      let botText;
+      if (data.response) {
+        botText = data.response;
+      } else if (data.RelevantEvents) {
+        botText = data.RelevantEvents.map(
+          (ev) =>
+            `• ${ev.Title}$
+              {ev.StandNumbers && ev.StandNumbers.length
+                ? ' (Stand: ' + ev.StandNumbers.join(', ') + ')'
+                : ''}`
+        ).join('\n');
+      } else {
+        botText = JSON.stringify(data);
+      }
+      addMessage(botText);
+      await trackChatMessage(botText, false);
+    } catch (error) {
+      hideTypingIndicator();
+      allMessages = allMessages.filter((m) => !m.sending);
+      showError('Sorry, er ging iets mis. Probeer het later opnieuw.');
+      await trackChatMessage(
+        'Sorry, er ging iets mis. Probeer het later opnieuw.',
+        false
+      );
     }
-  }
+    input.disabled = false;
+    input.focus();
+  };
 
   // Add resize handles to the chat window
   function addResizeHandles() {
@@ -271,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return [];
     }
     try {
-      const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+      const resp = await fetch(`${API_URL}/api/metrics/profile/${sessionId}`);
       if (!resp.ok) {
         isLoadingHistory = false;
         return [];
@@ -442,12 +461,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hasRegistered()) {
       const valid = await ensureValidSession();
       if (!valid) {
-        showRegistrationForm();
+        initializeWebsite();
         return;
       }
     }
     if (!hasRegistered()) {
-      showRegistrationForm();
+      initializeWebsite();
     } else {
       trackAnalyticsEvent('chat_start', {});
       form.style.display = '';
@@ -487,29 +506,25 @@ document.addEventListener('DOMContentLoaded', () => {
   headerTitle.insertAdjacentElement('afterend', registerBtn);
 
   registerBtn.onclick = async () => {
-    let sessionId = localStorage.getItem('chatbotSessionId');
-    let company = null;
+    const sessionId = getSessionIdCookie();
+    let profileInfo = null;
     if (sessionId) {
       try {
-        const resp = await fetch(
-          `${API_URL}/api/analytics/profile/${sessionId}`
-        );
+        const resp = await fetch(`${API_URL}/api/metrics/profile/${sessionId}`);
         if (resp.ok) {
           const profile = await resp.json();
-          company = profile.company || null;
+          profileInfo = profile.profileInfo || null;
         }
       } catch (e) {}
     }
-    const payload = { sessionId: sessionId || null, company: company };
-    await trackAnalyticsEvent('registration', payload);
+    await trackAnalyticsEvent('registration', { sessionId, website: websiteId, profileInfo });
     let url = '#';
     if (websiteId === 'ffd')
       url = 'https://ffd25.registration.xpogroup.com/invitation';
     else if (websiteId === 'abiss')
       url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
     else if (websiteId === 'artisan')
-      url =
-        'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
+      url = 'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
     window.open(url, '_blank');
   };
 
@@ -553,81 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // On chat form submit, check/create profile before sending message
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    // Toon direct het bericht met status 'Verzenden...'
-    const sendingMsg = {
-      text,
-      isUser: true,
-      timestamp: new Date(),
-      sending: true,
-    };
-    allMessages.push(sendingMsg);
-    lastRenderedScrollToBottom = true;
-    renderMessages();
-    input.value = '';
-    input.disabled = true;
-    // Ensure profile exists before sending message
-    const sessionId = getSessionIdCookie();
-    if (sessionId) {
-      const profileResp = await fetch(
-        `${API_URL}/api/analytics/profile/${sessionId}`
-      );
-      if (profileResp.status === 404) {
-        // Create profile if not exists
-        const regData = JSON.parse(
-          localStorage.getItem('registrationData') || '{}'
-        );
-        await createUserProfile(sessionId, regData, websiteId);
-      }
-    }
-    await trackChatMessage(text, true);
-    showTypingIndicator();
-    try {
-      const response = await fetch(`${API_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text, website: websiteId, sessionId }),
-      });
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
-      hideTypingIndicator();
-      // Vervang 'Verzenden...' status door het echte bericht
-      allMessages = allMessages.filter((m) => !m.sending);
-      addMessage(text, true); // user message definitief
-      let botText;
-      if (data.response) {
-        botText = data.response;
-      } else if (data.RelevantEvents) {
-        botText = data.RelevantEvents.map(
-          (ev) =>
-            `• ${ev.Title}${
-              ev.StandNumbers && ev.StandNumbers.length
-                ? ' (Stand: ' + ev.StandNumbers.join(', ') + ')'
-                : ''
-            }`
-        ).join('\n');
-      } else {
-        botText = JSON.stringify(data);
-      }
-      addMessage(botText);
-      await trackChatMessage(botText, false);
-    } catch (error) {
-      hideTypingIndicator();
-      allMessages = allMessages.filter((m) => !m.sending);
-      showError('Sorry, er ging iets mis. Probeer het later opnieuw.');
-      await trackChatMessage(
-        'Sorry, er ging iets mis. Probeer het later opnieuw.',
-        false
-      );
-    }
-    input.disabled = false;
-    input.focus();
-  };
-
   // Handle disclaimer close button
   if (disclaimerClose) {
     disclaimerClose.onclick = () => {
@@ -647,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sessionId) return false;
     try {
       const response = await fetch(
-        `${API_URL}/api/analytics/profile/${sessionId}`
+        `${API_URL}/api/metrics/profile/${sessionId}`
       );
       if (!response.ok) {
         if (response.status === 404) {
@@ -666,16 +606,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function trackAnalyticsEvent(eventType, payload = {}) {
     const sessionId = getSessionIdCookie();
     console.log('trackAnalyticsEvent sessionId:', sessionId);
-    fetch(`${API_URL}/api/analytics/event`, {
+    fetch(`${API_URL}/api/metrics/event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, eventType, payload }),
     })
       .then(async (response) => {
         if (response.status === 440) {
-          showRegistrationForm();
+          initializeWebsite();
           addMessage(
-            'Je sessie is verlopen of ongeldig. Vul het registratieformulier opnieuw in.'
+            'Je sessie is verlopen of ongeldig. Start opnieuw met je profielinfo.'
           );
         }
       })
@@ -686,15 +626,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionId = getSessionIdCookie();
     console.log('trackChatMessage sessionId:', sessionId);
     try {
-      const response = await fetch(`${API_URL}/api/analytics/chat`, {
+      const response = await fetch(`${API_URL}/api/metrics/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, message, isUser }),
       });
       if (response.status === 440) {
-        showRegistrationForm();
+        initializeWebsite();
         addMessage(
-          'Je sessie is verlopen of ongeldig, ververs de pagina en vul het registratieformulier opnieuw in.'
+          'Je sessie is verlopen of ongeldig, start opnieuw met je profielinfo.'
         );
         return;
       }
@@ -748,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionId = getSessionIdCookie();
     if (!sessionId) return false;
     try {
-      const resp = await fetch(`${API_URL}/api/analytics/profile/${sessionId}`);
+      const resp = await fetch(`${API_URL}/api/metrics/profile/${sessionId}`);
       if (resp.ok) return true;
       if (resp.status === 404) {
         clearSessionIdCookie();

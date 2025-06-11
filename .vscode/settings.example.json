@@ -1,0 +1,8 @@
+{
+  "liveServer.settings.https": {
+    "enable": true,
+    "cert": "~/.localhost-ssl/cert.pem",
+    "key": "~/.localhost-ssl/key.pem",
+    "passphrase": ""
+  }
+}
