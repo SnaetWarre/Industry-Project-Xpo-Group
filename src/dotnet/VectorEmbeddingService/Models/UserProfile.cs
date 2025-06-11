@@ -10,14 +10,8 @@ public class UserProfile
     [JsonPropertyName("sessionId")]
     public string SessionId { get; set; } = string.Empty;
 
-    [JsonPropertyName("company")]
-    public string Company { get; set; } = string.Empty;
-
-    [JsonPropertyName("jobTitle")]
-    public string JobTitle { get; set; } = string.Empty;
-
-    [JsonPropertyName("companyDescription")]
-    public string CompanyDescription { get; set; } = string.Empty;
+    [JsonPropertyName("profileInfo")]
+    public string ProfileInfo { get; set; } = string.Empty;
 
     [JsonPropertyName("chatHistory")]
     public List<ChatMessage> ChatHistory { get; set; } = new();
@@ -49,14 +43,8 @@ public class UserProfileRequest
     [JsonPropertyName("sessionId")]
     public string SessionId { get; set; } = string.Empty;
 
-    [JsonPropertyName("company")]
-    public string Company { get; set; } = string.Empty;
-
-    [JsonPropertyName("jobTitle")]
-    public string JobTitle { get; set; } = string.Empty;
-
-    [JsonPropertyName("companyDescription")]
-    public string CompanyDescription { get; set; } = string.Empty;
+    [JsonPropertyName("profileInfo")]
+    public string ProfileInfo { get; set; } = string.Empty;
 
     [JsonPropertyName("website")]
     public string Website { get; set; } = string.Empty;

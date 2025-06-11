@@ -3,16 +3,41 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle sign in logic here
+    setError('');
+    setLoading(true);
+    try {
+      // Use full backend URL for cross-origin request
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password }),
+        credentials: 'include', // Required for cookies from backend
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data?.message || 'Inloggen mislukt. Controleer je gegevens.');
+        setLoading(false);
+        return;
+      }
+      // On success, redirect to dashboard
+      router.push('/dashboard');
+    } catch (err) {
+      setError('Er is een fout opgetreden. Probeer het opnieuw.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -33,6 +58,9 @@ export default function SignIn() {
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-6">
+            {error && (
+              <div className="text-red-600 text-sm mb-2">{error}</div>
+            )}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-[#344054] mb-1.5">
                 E-mailadres*
@@ -93,8 +121,9 @@ export default function SignIn() {
             <button
               type="submit"
               className="w-full bg-red-10 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors"
+              disabled={loading}
             >
-              Inloggen
+              {loading ? 'Bezig met inloggen...' : 'Inloggen'}
             </button>
           </div>
         </form>
