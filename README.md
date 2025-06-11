@@ -149,3 +149,79 @@ python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/f
 - Adjust embedding chunk size in `AzureOpenAIEmbeddingService.cs` if your model supports more tokens per request.
 - For large events, consider chunking text before upload for best retrieval.
 - All REST endpoints are under `/api/events/` (see `EventsController.cs`). 
+
+## Local Development: HTTPS Setup Guide
+
+To run both the frontend and backend on HTTPS locally, follow these steps:
+
+### 1. Generate Self-Signed Certificates for Localhost
+
+```sh
+mkdir -p ~/.localhost-ssl
+openssl req -x509 -out ~/.localhost-ssl/cert.pem -keyout ~/.localhost-ssl/key.pem \
+  -newkey rsa:2048 -nodes -sha256 \
+  -subj '/CN=localhost' -extensions EXT -config <( \
+   printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
+```
+
+### 2. Trust the .NET Development Certificate
+
+```sh
+dotnet dev-certs https --trust
+```
+
+### 3. Configure Live Server for HTTPS
+
+Create or update `.vscode/settings.json` in your project root:
+
+```json
+{
+  "liveServer.settings.https": {
+    "enable": true,
+    "cert": "/home/warre/.localhost-ssl/cert.pem",
+    "key": "/home/warre/.localhost-ssl/key.pem",
+    "passphrase": ""
+  }
+}
+```
+
+### 4. Create launchSettings.json for .NET Backend
+
+Create the file at `src/dotnet/VectorEmbeddingService/Properties/launchSettings.json`:
+
+```json
+{
+  "profiles": {
+    "VectorEmbeddingService": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:5001;http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+```
+
+has already been done and added to the codebase. (no need for this) 
+
+### 5. Update Frontend API URL
+
+In your frontend JS (e.g., `chatbot.js`):
+
+```js
+const API_URL = 'https://localhost:5001';
+```
+
+has already been done and added to the codebase. (no need for this) 
+
+### 6. Restart Everything
+- Restart your backend: `dotnet run`
+- Restart Live Server
+- Open your site at `https://localhost:5500` (or the port Live Server uses)
+- Accept browser certificate warnings for both frontend and backend the first time
+
+---
+
+You are now running both frontend and backend on HTTPS with trusted local certificates and correct settings. 

@@ -31,7 +31,6 @@ obj/
 *.suo
 *.userprefs
 .vs/
-.vscode/
 *.swp
 *.*~
 project.lock.json
@@ -41,7 +40,6 @@ nupkg/
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 .cursor
@@ -55,7 +53,7 @@ nupkg/
 !tsconfig.json
 !launch.json
 !tasks.json
-!settings.json
+!settings.example.json
 
 # Keep specific data files
 !ffd_site_data_cleaned.json
@@ -64,6 +62,7 @@ nupkg/
 !artisan_site_data.json
 !abiss_site_data_cleaned.json
 !abiss_site_data.json
+!launchSettings.json
 
 # .NET Core appsettings
 src/dotnet/VectorEmbeddingService/appsettings.json
