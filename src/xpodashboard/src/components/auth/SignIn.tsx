@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import ApiService from '@/services/api';
+import { useRouter, useSearchParams } from 'next/navigation';
+import AuthService from '@/lib/services/auth/authService';
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
@@ -14,14 +14,17 @@ export default function SignIn() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await ApiService.getToken(username, password);
-      router.push('/dashboard');
+      await AuthService.login(username, password);
+      // Get the redirect URL from the 'from' query parameter, or default to dashboard
+      const from = searchParams.get('from') || '/dashboard';
+      router.push(from);
     } catch (err) {
       setError('Invalid username or password');
       setLoading(false);

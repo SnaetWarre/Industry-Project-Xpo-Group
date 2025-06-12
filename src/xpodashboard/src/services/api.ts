@@ -6,12 +6,6 @@ interface LoginResponse {
   token: string;
 }
 
-interface OverviewData {
-  registrationClicks: number;
-  users: number;
-  conversionRate: number;
-}
-
 class ApiService {
   private static token: string | null = null;
 
@@ -42,41 +36,6 @@ class ApiService {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
-  }
-
-  static async getOverviewData(website: string): Promise<OverviewData> {
-    try {
-      const headers = await this.getHeaders();
-      const response = await axios.get<OverviewData>(`${API_URL}/api/analytics-dashboard/overview?website=${website}`, { headers });
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to fetch overview data for ${website}:`, error);
-      throw error;
-    }
-  }
-
-  static async getAllOverviewData(): Promise<OverviewData> {
-    try {
-      const websites = ['ffd', 'artisan', 'abiss'];
-      const results = await Promise.all(websites.map((website) => this.getOverviewData(website)));
-
-      // Combine the results
-      return results.reduce(
-        (acc, curr) => ({
-          registrationClicks: acc.registrationClicks + curr.registrationClicks,
-          users: acc.users + curr.users,
-          conversionRate: acc.users + curr.users > 0 ? (acc.registrationClicks + curr.registrationClicks) / (acc.users + curr.users) : 0,
-        }),
-        {
-          registrationClicks: 0,
-          users: 0,
-          conversionRate: 0,
-        }
-      );
-    } catch (error) {
-      console.error('Failed to fetch all overview data:', error);
-      throw error;
-    }
   }
 }
 
