@@ -3,6 +3,7 @@ using VectorEmbeddingService.Models;
 using VectorEmbeddingService.Services;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Authorization;
 
 namespace VectorEmbeddingService.Controllers;
 
@@ -24,6 +25,7 @@ public class FfdController : ControllerBase
         _logger = logger;
     }
 
+    [Authorize]
     [HttpPost("search")]
     public async Task<ActionResult<List<EventDocument>>> SearchEvents([FromBody] SearchRequest request)
     {
@@ -35,6 +37,7 @@ public class FfdController : ControllerBase
         return Ok(similarEvents);
     }
 
+    [Authorize]
     [HttpPost("embedding")]
     public async Task<ActionResult<float[]>> GetEmbedding([FromBody] EmbeddingRequest request)
     {
@@ -44,6 +47,7 @@ public class FfdController : ControllerBase
         return Ok(embedding);
     }
 
+    [Authorize]
     [HttpPost("bulk-upload")]
     public async Task<ActionResult<object>> BulkUploadEvents([FromBody] BulkUploadRequest request)
     {
@@ -84,6 +88,7 @@ public class FfdController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize]
     [HttpGet("{id}")]
     public async Task<ActionResult<EventDocument>> GetEvent(string id)
     {
@@ -93,6 +98,7 @@ public class FfdController : ControllerBase
         return Ok(eventDocument);
     }
 
+    [Authorize]
     [HttpGet]
     public async Task<ActionResult<List<EventDocument>>> GetAllEvents()
     {
@@ -100,6 +106,7 @@ public class FfdController : ControllerBase
         return Ok(events);
     }
 
+    [Authorize]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteEvent(string id)
     {
@@ -109,6 +116,7 @@ public class FfdController : ControllerBase
         return NoContent();
     }
 
+    [Authorize]
     [HttpGet("count")]
     public async Task<ActionResult<object>> GetEventCount()
     {
@@ -116,6 +124,7 @@ public class FfdController : ControllerBase
         return Ok(new { Count = count });
     }
 
+    [Authorize]
     [HttpPost("chat")]
     public async Task<ActionResult<object>> GetChatbotResponse([FromBody] ChatRequest request)
     {
@@ -141,6 +150,7 @@ public class FfdController : ControllerBase
         });
     }
 
+    [Authorize]
     [HttpDelete]
     public async Task<IActionResult> DeleteAllEvents()
     {

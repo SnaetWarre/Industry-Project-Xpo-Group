@@ -3,6 +3,7 @@ using VectorEmbeddingService.Models;
 using VectorEmbeddingService.Services;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Authorization;
 
 namespace VectorEmbeddingService.Controllers;
 
@@ -23,6 +24,8 @@ public class AbissController : ControllerBase
         _embeddingService = embeddingService;
         _logger = logger;
     }
+
+    [Authorize]
     [HttpPost("search")]
     public async Task<ActionResult<List<EventDocument>>> SearchEvents([FromBody] SearchRequest request)
     {
@@ -33,6 +36,8 @@ public class AbissController : ControllerBase
         _logger.LogInformation("Search completed for query: '{Query}', found {Count} results", request.Query, similarEvents.Count);
         return Ok(similarEvents);
     }
+
+    [Authorize]
     [HttpPost("embedding")]
     public async Task<ActionResult<float[]>> GetEmbedding([FromBody] EmbeddingRequest request)
     {
@@ -41,6 +46,8 @@ public class AbissController : ControllerBase
         var embedding = await _embeddingService.GetEmbeddingAsync(request.Text);
         return Ok(embedding);
     }
+
+    [Authorize]
     [HttpPost("bulk-upload")]
     public async Task<ActionResult<object>> BulkUploadEvents([FromBody] BulkUploadRequest request)
     {
@@ -80,6 +87,8 @@ public class AbissController : ControllerBase
         _logger.LogInformation("Bulk upload completed: {Successful}/{Total} events uploaded successfully", upsertedIds.Count, request.Events.Count);
         return Ok(result);
     }
+
+    [Authorize]
     [HttpGet("{id}")]
     public async Task<ActionResult<EventDocument>> GetEvent(string id)
     {
@@ -88,12 +97,16 @@ public class AbissController : ControllerBase
             return NotFound($"Event with ID {id} not found");
         return Ok(eventDocument);
     }
+
+    [Authorize]
     [HttpGet]
     public async Task<ActionResult<List<EventDocument>>> GetAllEvents()
     {
         var events = await _cosmosDbService.GetAllEventsAsync();
         return Ok(events);
     }
+
+    [Authorize]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteEvent(string id)
     {
@@ -102,12 +115,16 @@ public class AbissController : ControllerBase
             return NotFound($"Event with ID {id} not found");
         return NoContent();
     }
+
+    [Authorize]
     [HttpGet("count")]
     public async Task<ActionResult<object>> GetEventCount()
     {
         var count = await _cosmosDbService.GetEventCountAsync();
         return Ok(new { Count = count });
     }
+
+    [Authorize]
     [HttpPost("chat")]
     public async Task<ActionResult<object>> GetChatbotResponse([FromBody] ChatRequest request)
     {
@@ -132,10 +149,12 @@ public class AbissController : ControllerBase
             TotalResults = formattedEvents.Count
         });
     }
+
+    [Authorize]
     [HttpDelete]
     public async Task<IActionResult> DeleteAllEvents()
     {
         await _cosmosDbService.DeleteAllEventsAsync();
         return NoContent();
     }
-} 
+}

@@ -34,22 +34,30 @@ public class AuthController : ControllerBase
 
         var user = _users.FirstOrDefault(u => u.Username == request.Username && u.Password == request.Password);
         if (user == null)
+        {
+            // Log failed login attempt
+            Console.WriteLine($"Failed login attempt for username: {request.Username}");
             return Unauthorized("Invalid username or password");
+        }
 
         var token = GenerateJwtToken(request.Username);
 
         // Set JWT as HTTP-only cookie
+        var isProduction = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production";
         Response.Cookies.Append(
             "jwt",
             token,
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = false, // Set to true in production (requires HTTPS)
+                Secure = isProduction, // Secure=true in production (requires HTTPS)
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddHours(24)
             }
         );
+
+        // Log successful login
+        Console.WriteLine($"Successful login for username: {request.Username}");
 
         return Ok(new { token });
     }
