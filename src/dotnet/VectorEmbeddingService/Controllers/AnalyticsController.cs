@@ -235,34 +235,48 @@ public class AnalyticsController : ControllerBase
                 return Unauthorized("Session cookie missing");
             var profile = await GetUserProfileBySessionId(sessionId);
             if (profile == null)
-                return StatusCode(440, new { success = false, error = "SessionInvalid", message = "User profile/session not found. Please re-register." });
-
-            if (string.IsNullOrEmpty(request.ProfileInfo))
-                return BadRequest("ProfileInfo is required");
-
-            var newProfile = new UserProfile
             {
-                Id = Guid.NewGuid().ToString(),
-                SessionId = sessionId,
-                ProfileInfo = request.ProfileInfo,
-                Website = request.Website,
-                ChatHistory = new List<ChatMessage>(),
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                // Create new profile
+                var newProfile = new UserProfile
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    SessionId = sessionId,
+                    ProfileInfo = request.ProfileInfo,
+                    Website = request.Website,
+                    ChatHistory = new List<ChatMessage>(),
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
-            // Upsert the profile to CosmosDB
+                await _userProfilesContainer.UpsertItemAsync(
+                    newProfile,
+                    new PartitionKey(sessionId)
+                );
+
+                _logger.LogInformation(
+                    "User profile created for session {SessionId}",
+                    sessionId
+                );
+
+                return Ok(new { success = true, id = newProfile.Id });
+            }
+
+            // If profile exists, update it (if needed)
+            profile.ProfileInfo = request.ProfileInfo;
+            profile.Website = request.Website;
+            profile.UpdatedAt = DateTime.UtcNow;
+
             await _userProfilesContainer.UpsertItemAsync(
-                newProfile,
+                profile,
                 new PartitionKey(sessionId)
             );
 
             _logger.LogInformation(
-                "User profile created for session {SessionId}",
+                "User profile updated for session {SessionId}",
                 sessionId
             );
 
-            return Ok(new { success = true, id = newProfile.Id });
+            return Ok(new { success = true, id = profile.Id });
         }
         catch (Exception ex)
         {
