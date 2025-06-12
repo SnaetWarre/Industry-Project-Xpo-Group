@@ -7,6 +7,7 @@ export const API_CONFIG = {
     analytics: {
       overview: '/api/analytics-dashboard/overview',
       registrationClicks: '/api/analytics-dashboard/registration-clicks',
+      exportRegistrationClicks: '/api/analytics-dashboard/export/registration-clicks-all.csv',
     },
   },
 } as const;
