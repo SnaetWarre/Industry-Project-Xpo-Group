@@ -168,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sid = data.sessionId;
       }
       await createUserProfile(sid, text, websiteId);
+      // Track chat_start event immediately after profile creation
+      await trackAnalyticsEvent('chat_start', { sessionId: sid, website: websiteId, profileInfo: text });
       allMessages = allMessages.filter((m) => !m.sending);
       addMessage(text, true);
       // Bot antwoordt met vervolgvraag
