@@ -168,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sid = data.sessionId;
       }
       await createUserProfile(sid, text, websiteId);
+      // Track chat_start event immediately after profile creation
+      await trackAnalyticsEvent('chat_start', { sessionId: sid, website: websiteId, profileInfo: text });
       allMessages = allMessages.filter((m) => !m.sending);
       addMessage(text, true);
       // Bot antwoordt met vervolgvraag
@@ -524,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (websiteId === 'abiss')
       url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
     else if (websiteId === 'artisan')
-      url = 'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
+      url = 'https://artisan25visitors.registration.xpogroup.com/?language=nl';
     window.open(url, '_blank');
   };
 

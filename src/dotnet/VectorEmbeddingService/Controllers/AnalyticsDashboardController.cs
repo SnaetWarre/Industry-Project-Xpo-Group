@@ -4,6 +4,7 @@ using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Models;
 using System.Globalization;
 using System.Text;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace VectorEmbeddingService.Controllers;
 
@@ -44,8 +45,8 @@ public class AnalyticsDashboardController : ControllerBase
         // Registration clicks
         int registrationClicks = analytics
             .SelectMany(a => a.Days.Values)
-            .Where(d => d.CompanyStats != null)
-            .Sum(d => d.CompanyStats.Values.Sum());
+            .Where(d => d.ProfileInfoStats != null)
+            .Sum(d => d.ProfileInfoStats.Values.Sum());
         // Users
         var userQuery = new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE c.website = @website")
             .WithParameter("@website", website);
@@ -92,13 +93,13 @@ public class AnalyticsDashboardController : ControllerBase
         {
             foreach (var (date, day) in a.Days)
             {
-                if (day.CompanyStats != null)
+                if (day.ProfileInfoStats != null)
                 {
-                    foreach (var (company, count) in day.CompanyStats)
+                    foreach (var (profileInfo, count) in day.ProfileInfoStats)
                     {
                         result.Add(new
                         {
-                            company,
+                            profileInfo,
                             date,
                             count
                         });
@@ -129,7 +130,7 @@ public class AnalyticsDashboardController : ControllerBase
         var result = analytics.Select(a => new
         {
             week = a.Id,
-            registrationClicks = a.Days.Values.Where(d => d.CompanyStats != null).Sum(d => d.CompanyStats.Values.Sum()),
+            registrationClicks = a.Days.Values.Where(d => d.ProfileInfoStats != null).Sum(d => d.ProfileInfoStats.Values.Sum()),
             sessions = a.Days.Values.Sum(d => d.UniqueSessions.Count)
         });
         return Ok(result);
@@ -161,7 +162,7 @@ public class AnalyticsDashboardController : ControllerBase
                 {
                     date,
                     uniqueSessions = day.UniqueSessions?.Count ?? 0,
-                    companyStats = day.CompanyStats,
+                    profileInfoStats = day.ProfileInfoStats,
                     sessionData = day.SessionData
                 });
             }
@@ -230,16 +231,16 @@ public class AnalyticsDashboardController : ControllerBase
             }
         }
         var sb = new StringBuilder();
-        sb.AppendLine("Company,Date,Count");
+        sb.AppendLine("ProfileInfo,Date,Count");
         foreach (var a in analytics)
         {
             foreach (var (date, day) in a.Days)
             {
-                if (day.CompanyStats != null)
+                if (day.ProfileInfoStats != null)
                 {
-                    foreach (var (company, count) in day.CompanyStats)
+                    foreach (var (profileInfo, count) in day.ProfileInfoStats)
                     {
-                        sb.AppendLine($"{company},{date},{count}");
+                        sb.AppendLine($"{profileInfo},{date},{count}");
                     }
                 }
             }
@@ -250,8 +251,17 @@ public class AnalyticsDashboardController : ControllerBase
     /// <summary>
     /// Get activity (messages, registrations) over a date range.
     /// </summary>
+    /// <param name="from">Start date (format: YYYY-MM-DD)</param>
+    /// <param name="to">End date (format: YYYY-MM-DD)</param>
+    /// <param name="website">Website ID (e.g., ffd, abiss, artisan)</param>
+    /// <remarks>
+    /// The 'from' and 'to' parameters must be in ISO 8601 format: YYYY-MM-DD (e.g., 2025-06-13).
+    /// </remarks>
     [HttpGet("activity")]
-    public async Task<IActionResult> GetActivity([FromQuery] string from, [FromQuery] string to, [FromQuery] string website)
+    public async Task<IActionResult> GetActivity(
+        [FromQuery, SwaggerParameter("Start date (format: YYYY-MM-DD, e.g. 2025-06-13)")] string from,
+        [FromQuery, SwaggerParameter("End date (format: YYYY-MM-DD, e.g. 2025-06-13)")] string to,
+        [FromQuery, SwaggerParameter("Website ID (e.g. ffd, abiss, artisan)")] string website)
     {
         // Parse dates
         DateTime fromDate = DateTime.Parse(from);
@@ -280,12 +290,52 @@ public class AnalyticsDashboardController : ControllerBase
                         {
                             date,
                             messages = day.SessionData?.Count ?? 0,
-                            registrations = day.CompanyStats?.Values.Sum() ?? 0
+                            registrations = day.ProfileInfoStats?.Values.Sum() ?? 0
                         });
                     }
                 }
             }
         }
         return Ok(result);
+    }
+
+
+    /// <summary>
+    /// Export registration clicks as CSV for all websites (abiss, ffd, artisan).
+    /// </summary>
+    [HttpGet("export/registration-clicks-all.csv")]
+    public async Task<IActionResult> ExportRegistrationClicksAllCsv()
+    {
+        var websiteIds = new[] { "abiss", "ffd", "artisan" };
+        var sb = new StringBuilder();
+        sb.AppendLine("Website,ProfileInfo,Date,Count");
+        foreach (var website in websiteIds)
+        {
+            var query = new QueryDefinition("SELECT * FROM c WHERE c.website = @website")
+                .WithParameter("@website", website);
+            var analytics = new List<WeeklyAnalytics>();
+            using (var iterator = _analyticsContainer.GetItemQueryIterator<WeeklyAnalytics>(query))
+            {
+                while (iterator.HasMoreResults)
+                {
+                    var response = await iterator.ReadNextAsync();
+                    analytics.AddRange(response);
+                }
+            }
+            foreach (var a in analytics)
+            {
+                foreach (var (date, day) in a.Days)
+                {
+                    if (day.ProfileInfoStats != null)
+                    {
+                        foreach (var (profileInfo, count) in day.ProfileInfoStats)
+                        {
+                            sb.AppendLine($"{website},{profileInfo},{date},{count}");
+                        }
+                    }
+                }
+            }
+        }
+        return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "registration_clicks_all.csv");
     }
 } 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -13,6 +13,47 @@ interface NavProps {
 const Nav = ({ children }: NavProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isActive = (path: string) => {
+    if (!pathname) return false;
+    return pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
+  };
+
+  const renderNavLinks = () => {
+    if (!mounted) return null;
+
+    return (
+      <nav className="space-y-2">
+        <Link 
+          href="/dashboard"
+          className={`flex transition-all duration-300 items-center px-4 py-2 rounded-lg ${
+            isActive('/dashboard') 
+              ? 'bg-red-10 text-white' 
+              : 'text-gray-700 hover:bg-red-10/10'
+          }`}
+        >
+          <LayoutDashboard className="h-5 w-5 mr-3" />
+          Dashboard
+        </Link>
+        <Link 
+          href="/chatgeschiedenis"
+          className={`flex transition-all duration-300 items-center px-4 py-2 rounded-lg ${
+            isActive('/chatgeschiedenis')
+              ? 'bg-red-10 text-white'
+              : 'text-gray-700 hover:bg-red-10/10'
+          }`}
+        >
+          <MessageSquare className="h-5 w-5 mr-3" />
+          Chatgeschiedenis
+        </Link>
+      </nav>
+    );
+  };
 
   return (
     <div className="flex">
@@ -24,32 +65,10 @@ const Nav = ({ children }: NavProps) => {
             alt="Kortrijk Xpo"
             width={180}
             height={50}
+            priority
             className="mb-8"
           />
-          <nav className="space-y-2">
-            <Link 
-              href="/dashboard"
-              className={`flex transition-all duration-300 items-center px-4 py-2 rounded-lg ${
-                pathname === '/dashboard' 
-                  ? 'bg-red-10 text-white' 
-                  : 'text-gray-700 hover:bg-red-10/10'
-              }`}
-            >
-              <LayoutDashboard className="h-5 w-5 mr-3" />
-              Dashboard
-            </Link>
-            <Link 
-              href="/chatgeschiedenis"
-              className={`flex transition-all duration-300 items-center px-4 py-2 rounded-lg ${
-                pathname === '/chatgeschiedenis'
-                  ? 'bg-red-10 text-white'
-                  : 'text-gray-700 hover:bg-red-10/10'
-              }`}
-            >
-              <MessageSquare className="h-5 w-5 mr-3" />
-              Chatgeschiedenis
-            </Link>
-          </nav>
+          {renderNavLinks()}
         </div>
       </div>
 
