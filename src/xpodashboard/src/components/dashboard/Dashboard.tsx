@@ -7,6 +7,7 @@ import Link from 'next/link';
 import DashboardService from '@/lib/services/analytics/dashboardService';
 import ChartService from '@/lib/services/analytics/chartService';
 import type { DashboardOverview, ChartData } from '@/lib/types/analytics';
+import CustomDropdown from '@/components/core/CustomDropdown';
 
 const MONTHS = [
   'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
@@ -136,15 +137,11 @@ export const Dashboard = () => {
         <div className="bg-white rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl text-black">Registratie kliks</h2>
-            <select 
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-black"
-              value={selectedMonth}
-              onChange={handleMonthChange}
-            >
-              {availableMonths.map((month, index) => (
-                <option key={month} value={index}>{month}</option>
-              ))}
-            </select>
+            <CustomDropdown
+              value={MONTHS[selectedMonth]}
+              options={availableMonths}
+              onChange={(_, index) => setSelectedMonth(index)}
+            />
           </div>
 
           <div className="h-[400px]">

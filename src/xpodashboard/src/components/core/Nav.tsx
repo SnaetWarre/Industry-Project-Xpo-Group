@@ -24,13 +24,14 @@ const Nav = ({ children }: NavProps) => {
             alt="Kortrijk Xpo"
             width={180}
             height={50}
+            priority
             className="mb-8"
           />
           <nav className="space-y-2">
             <Link 
-              href="/dashboard"
+              href="/dashboard/"
               className={`flex transition-all duration-300 items-center px-4 py-2 rounded-lg ${
-                pathname === '/dashboard' 
+                pathname === '/dashboard/' 
                   ? 'bg-red-10 text-white' 
                   : 'text-gray-700 hover:bg-red-10/10'
               }`}
@@ -39,9 +40,9 @@ const Nav = ({ children }: NavProps) => {
               Dashboard
             </Link>
             <Link 
-              href="/chatgeschiedenis"
+              href="/chatgeschiedenis/"
               className={`flex transition-all duration-300 items-center px-4 py-2 rounded-lg ${
-                pathname === '/chatgeschiedenis'
+                pathname === '/chatgeschiedenis/'
                   ? 'bg-red-10 text-white'
                   : 'text-gray-700 hover:bg-red-10/10'
               }`}
