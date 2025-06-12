@@ -50,7 +50,7 @@ public class AnalyticsController : ControllerBase
                 _logger.LogWarning("Analytics event received for missing profile. SessionId: {SessionId}, EventType: {EventType}", sessionId, analyticsEvent.EventType);
                 return StatusCode(440, new { success = false, error = "SessionInvalid", message = "User profile/session not found. Please re-register." });
             }
-            string company = profile.ProfileInfo ?? "unknown";
+            string profileInfo = profile.ProfileInfo ?? "unknown";
             string website = profile.Website ?? "unknown";
 
             // Do not create analytics documents for unknown websites
@@ -107,7 +107,7 @@ public class AnalyticsController : ControllerBase
                 sessionData = new SessionData
                 {
                     ChatStartTime = now,
-                    Company = company
+                    ProfileInfo = profileInfo
                 };
                 daily.SessionData[sessionId] = sessionData;
             }
@@ -116,19 +116,19 @@ public class AnalyticsController : ControllerBase
             if (analyticsEvent.EventType == "chat_start")
             {
                 sessionData.ChatStartTime = now;
-                sessionData.Company = company;
+                sessionData.ProfileInfo = profileInfo;
             }
 
             // Handle registration click event
             if (analyticsEvent.EventType == "registration")
             {
-                // Always update company stats, even if chat was not started
-                if (!string.IsNullOrEmpty(company))
+                // Always update profileInfo stats, even if chat was not started
+                if (!string.IsNullOrEmpty(profileInfo))
                 {
-                    daily.CompanyStats ??= new Dictionary<string, int>();
-                    if (!daily.CompanyStats.ContainsKey(company))
-                        daily.CompanyStats[company] = 0;
-                    daily.CompanyStats[company]++;
+                    daily.ProfileInfoStats ??= new Dictionary<string, int>();
+                    if (!daily.ProfileInfoStats.ContainsKey(profileInfo))
+                        daily.ProfileInfoStats[profileInfo] = 0;
+                    daily.ProfileInfoStats[profileInfo]++;
                 }
                 // Always update sessionData for registration
                 sessionData.RegistrationClickTime = now;
@@ -149,10 +149,10 @@ public class AnalyticsController : ControllerBase
             );
 
             _logger.LogInformation(
-                "Weekly analytics updated: {Id} (session {SessionId}, company {Company}, website {Website}, day {Day})",
+                "Weekly analytics updated: {Id} (session {SessionId}, profileInfo {ProfileInfo}, website {Website}, day {Day})",
                 analytics.Id,
                 sessionId,
-                company,
+                profileInfo,
                 website,
                 today
             );

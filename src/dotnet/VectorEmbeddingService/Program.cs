@@ -2,6 +2,7 @@ using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.Annotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,8 @@ builder.Services.AddSwaggerGen(options =>
         }
     };
     options.AddSecurityRequirement(securityRequirement);
+
+    options.EnableAnnotations();
 });
 
 // Add CORS

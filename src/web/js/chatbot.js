@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (websiteId === 'abiss')
       url = 'https://www.abissummit.nl/nl/bezoeken/praktische-info/';
     else if (websiteId === 'artisan')
-      url = 'https://www.artisan-xpo.be/nl/plan-uw-bezoek/registreer-uw-bezoek/';
+      url = 'https://artisan25visitors.registration.xpogroup.com/?language=nl';
     window.open(url, '_blank');
   };
 
