@@ -62,6 +62,13 @@ class RegistrationClicksService {
     const allClicks: TableRow[] = [];
     let idCounter = 1;
 
+    function formatDuration(seconds: number | undefined): string {
+      if (typeof seconds !== 'number' || isNaN(seconds)) return '-';
+      const min = Math.floor(seconds / 60);
+      const sec = +(seconds % 60).toFixed(2);
+      return `${min > 0 ? min + ' min. ' : ''}${sec} sec`;
+    }
+
     try {
       // Fetch data for all websites and weeks
       const promises = websites.flatMap((website) => weeks.map(({ year, week }) => this.fetchDataForWebsite(website, year, week)));
@@ -71,12 +78,12 @@ class RegistrationClicksService {
       // Process and combine all results
       results.forEach((weekData) => {
         if (Array.isArray(weekData)) {
-          weekData.forEach((click: RegistrationClick) => {
+          weekData.forEach((click: any) => {
             allClicks.push({
               id: idCounter.toString().padStart(5, '0'),
               profielInfo: click.profileInfo,
               date: click.date,
-              gespreksDuur: '2 min. 15 sec.', // Hardcoded as requested
+              gespreksDuur: formatDuration(click.chatToRegistrationSeconds),
             });
             idCounter++;
           });
