@@ -338,4 +338,56 @@ public class AnalyticsDashboardController : ControllerBase
         }
         return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "registration_clicks_all.csv");
     }
+
+    /// <summary>
+    /// Get total messages for a website (if provided) or for all websites.
+    /// Only counts messages where IsUser is true (user messages only).
+    /// Only allows website values: ffd, artisan, abiss.
+    /// </summary>
+    [HttpGet("total-messages")]
+    public async Task<IActionResult> GetTotalMessages([FromQuery] string? website = null)
+    {
+        var allowedWebsites = new HashSet<string> { "ffd", "artisan", "abiss" };
+        if (!string.IsNullOrEmpty(website) && !allowedWebsites.Contains(website))
+        {
+            return BadRequest(new { error = "Invalid website id. Allowed values: ffd, artisan, abiss." });
+        }
+
+        int chatMessages = 0;
+        if (string.IsNullOrEmpty(website))
+        {
+            // Sum for all allowed websites
+            foreach (var w in allowedWebsites)
+            {
+                var userQuery = new QueryDefinition("SELECT * FROM c WHERE c.website = @website").WithParameter("@website", w);
+                var users = new List<UserProfile>();
+                using (var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(userQuery))
+                {
+                    while (iterator.HasMoreResults)
+                    {
+                        var response = await iterator.ReadNextAsync();
+                        users.AddRange(response);
+                    }
+                }
+                chatMessages += users.Sum(u => u.ChatHistory?.Count(m => m.IsUser) ?? 0);
+            }
+        }
+        else
+        {
+            var userQuery = new QueryDefinition("SELECT * FROM c WHERE c.website = @website").WithParameter("@website", website);
+            var users = new List<UserProfile>();
+            using (var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(userQuery))
+            {
+                while (iterator.HasMoreResults)
+                {
+                    var response = await iterator.ReadNextAsync();
+                    users.AddRange(response);
+                }
+            }
+            chatMessages = users.Sum(u => u.ChatHistory?.Count(m => m.IsUser) ?? 0);
+        }
+        return Ok(new { totalMessages = chatMessages });
+    }
+
+    
 } 
