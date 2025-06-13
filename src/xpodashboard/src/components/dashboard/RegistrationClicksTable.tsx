@@ -22,6 +22,7 @@ const RegistrationClicksTable = () => {
     const fetchData = async () => {
       try {
         const data = await RegistrationClicksService.getAllRegistrationClicks();
+        data.sort((a, b) => Number(a.id) - Number(b.id));
         setRegistrationClicks(data);
       } catch (err) {
         setError('Er is een fout opgetreden bij het ophalen van de data.');
@@ -64,7 +65,7 @@ const RegistrationClicksTable = () => {
         <button 
           onClick={handleDownloadCSV}
           disabled={isDownloading}
-          className="inline-flex items-center gap-2 text-black border border-black px-4 py-2 hover:bg-red-10 hover:text-white hover:border-red-10 transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-2 text-black border border-black px-4 py-2 hover:border-red-10 transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
         >
           <Download className="h-5 w-5" />
           {isDownloading ? 'Downloading...' : 'Download CSV'}

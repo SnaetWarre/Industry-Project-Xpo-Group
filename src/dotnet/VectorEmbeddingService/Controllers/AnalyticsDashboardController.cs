@@ -97,11 +97,22 @@ public class AnalyticsDashboardController : ControllerBase
                 {
                     foreach (var (profileInfo, count) in day.ProfileInfoStats)
                     {
+                        // Zoek de sessie voor deze profileInfo
+                        double? chatToRegistrationSeconds = null;
+                        if (day.SessionData != null)
+                        {
+                            var session = day.SessionData.Values.FirstOrDefault(s => s.ProfileInfo == profileInfo);
+                            if (session != null)
+                            {
+                                chatToRegistrationSeconds = session.ChatToRegistrationSeconds;
+                            }
+                        }
                         result.Add(new
                         {
                             profileInfo,
                             date,
-                            count
+                            count,
+                            chatToRegistrationSeconds
                         });
                     }
                 }
