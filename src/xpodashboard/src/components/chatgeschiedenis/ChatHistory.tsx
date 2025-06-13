@@ -14,6 +14,7 @@ import {
   ColumnFiltersState,
 } from '@tanstack/react-table';
 import { useState } from 'react';
+import CustomDropdown from '@/components/core/CustomDropdown';
 
 type ChatEntry = {
   id: string;
@@ -200,79 +201,24 @@ const ChatHistory = () => {
             <Filter className="h-5 w-5 text-neutral-500" />
             <span className="font-medium text-black">Filteren op</span>
           </div>
-          
           {/* Date Filter */}
-          <div className="relative">
-            <button 
-              className="flex items-center gap-2 px-4 py-2 hover:bg-white rounded-lg text-black"
-              onClick={() => setIsDateOpen(!isDateOpen)}
-            >
-              <span>{dateFilter || 'Datum'}</span>
-              <ChevronDown className="h-4 w-4 text-neutral-500" />
-            </button>
-            {isDateOpen && (
-              <div className="absolute top-full mt-1 w-40 bg-white border border-neutral-150 rounded-lg shadow-lg z-10">
-                {uniqueDates.map((date) => (
-                  <button
-                    key={date}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-black"
-                    onClick={() => applyDateFilter(date)}
-                  >
-                    {date}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
+          <CustomDropdown
+            value={dateFilter || 'Datum'}
+            options={uniqueDates}
+            onChange={(value) => applyDateFilter(value)}
+          />
           {/* Beurs Filter */}
-          <div className="relative">
-            <button 
-              className="flex items-center gap-2 px-4 py-2 hover:bg-white rounded-lg text-black"
-              onClick={() => setIsBeursOpen(!isBeursOpen)}
-            >
-              <span>{beursFilter || 'Beurs'}</span>
-              <ChevronDown className="h-4 w-4 text-neutral-500" />
-            </button>
-            {isBeursOpen && (
-              <div className="absolute top-full mt-1 w-40 bg-white border border-neutral-150 rounded-lg shadow-lg z-10">
-                {uniqueBeurs.map((beurs) => (
-                  <button
-                    key={beurs}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-black"
-                    onClick={() => applyBeursFilter(beurs)}
-                  >
-                    {beurs}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
+          <CustomDropdown
+            value={beursFilter || 'Beurs'}
+            options={uniqueBeurs}
+            onChange={(value) => applyBeursFilter(value)}
+          />
           {/* Status Filter */}
-          <div className="relative">
-            <button 
-              className="flex items-center gap-2 px-4 py-2 hover:bg-white rounded-lg text-black"
-              onClick={() => setIsStatusOpen(!isStatusOpen)}
-            >
-              <span>{statusFilter || 'Geklikt'}</span>
-              <ChevronDown className="h-4 w-4 text-neutral-500" />
-            </button>
-            {isStatusOpen && (
-              <div className="absolute top-full mt-1 w-40 bg-white border border-neutral-150 rounded-lg shadow-lg z-10">
-                {statusOptions.map((status) => (
-                  <button
-                    key={status}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-black"
-                    onClick={() => applyStatusFilter(status)}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
+          <CustomDropdown
+            value={statusFilter || 'Geklikt'}
+            options={statusOptions}
+            onChange={(value) => applyStatusFilter(value)}
+          />
           <button 
             className="flex items-center gap-2 text-red-10 ml-auto cursor-pointer"
             onClick={resetFilters}
