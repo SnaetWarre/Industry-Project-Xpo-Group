@@ -46,7 +46,7 @@ public class AnalyticsDashboardController : ControllerBase
         int registrationClicks = analytics
             .SelectMany(a => a.Days.Values)
             .Where(d => d.ProfileInfoStats != null)
-            .Sum(d => d.ProfileInfoStats.Values.Sum());
+            .Sum(d => d.ProfileInfoStats.Values.Count(v => v));
         // Users
         var userQuery = new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE c.website = @website")
             .WithParameter("@website", website);
@@ -95,7 +95,7 @@ public class AnalyticsDashboardController : ControllerBase
             {
                 if (day.ProfileInfoStats != null)
                 {
-                    foreach (var (profileInfo, count) in day.ProfileInfoStats)
+                    foreach (var (profileInfo, clicked) in day.ProfileInfoStats)
                     {
                         // Zoek de sessie voor deze profileInfo
                         double? chatToRegistrationSeconds = null;
@@ -111,7 +111,7 @@ public class AnalyticsDashboardController : ControllerBase
                         {
                             profileInfo,
                             date,
-                            count,
+                            count = clicked ? 1 : 0,
                             chatToRegistrationSeconds
                         });
                     }
@@ -141,7 +141,7 @@ public class AnalyticsDashboardController : ControllerBase
         var result = analytics.Select(a => new
         {
             week = a.Id,
-            registrationClicks = a.Days.Values.Where(d => d.ProfileInfoStats != null).Sum(d => d.ProfileInfoStats.Values.Sum()),
+            registrationClicks = a.Days.Values.Where(d => d.ProfileInfoStats != null).Sum(d => d.ProfileInfoStats.Values.Count(v => v)),
             sessions = a.Days.Values.Sum(d => d.UniqueSessions.Count)
         });
         return Ok(result);
@@ -249,9 +249,9 @@ public class AnalyticsDashboardController : ControllerBase
             {
                 if (day.ProfileInfoStats != null)
                 {
-                    foreach (var (profileInfo, count) in day.ProfileInfoStats)
+                    foreach (var (profileInfo, clicked) in day.ProfileInfoStats)
                     {
-                        sb.AppendLine($"{profileInfo},{date},{count}");
+                        sb.AppendLine($"{profileInfo},{date},{(clicked ? 1 : 0)}");
                     }
                 }
             }
@@ -301,7 +301,7 @@ public class AnalyticsDashboardController : ControllerBase
                         {
                             date,
                             messages = day.SessionData?.Count ?? 0,
-                            registrations = day.ProfileInfoStats?.Values.Sum() ?? 0
+                            registrations = day.ProfileInfoStats?.Values.Count(v => v) ?? 0
                         });
                     }
                 }
@@ -339,9 +339,9 @@ public class AnalyticsDashboardController : ControllerBase
                 {
                     if (day.ProfileInfoStats != null)
                     {
-                        foreach (var (profileInfo, count) in day.ProfileInfoStats)
+                        foreach (var (profileInfo, clicked) in day.ProfileInfoStats)
                         {
-                            sb.AppendLine($"{website},{profileInfo},{date},{count}");
+                            sb.AppendLine($"{website},{profileInfo},{date},{(clicked ? 1 : 0)}");
                         }
                     }
                 }
@@ -400,5 +400,75 @@ public class AnalyticsDashboardController : ControllerBase
         return Ok(new { totalMessages = chatMessages });
     }
 
-    
+    /// <summary>
+    /// Get the chat duration (in seconds and formatted) for a user profile by sessionId.
+    /// </summary>
+    [HttpGet("chat-duration/{sessionId}")]
+    public async Task<IActionResult> GetChatDuration(string sessionId)
+    {
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.sessionId = @sessionId")
+            .WithParameter("@sessionId", sessionId);
+        var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(query);
+        var results = await iterator.ReadNextAsync();
+        var profile = results.FirstOrDefault();
+        if (profile == null || profile.ChatHistory == null || profile.ChatHistory.Count < 2)
+            return Ok(new { durationSeconds = 0, formatted = "0s" });
+        var ordered = profile.ChatHistory.OrderBy(m => m.Timestamp).ToList();
+        var first = ordered.First().Timestamp;
+        var last = ordered.Last().Timestamp;
+        var duration = last - first;
+        int totalSeconds = (int)duration.TotalSeconds;
+        string formatted = FormatDuration(totalSeconds);
+        return Ok(new { durationSeconds = totalSeconds, formatted });
+    }
+
+    /// <summary>
+    /// Get the average chat duration (in seconds and formatted) for all user profiles, optionally filtered by website.
+    /// </summary>
+    [HttpGet("average-chat-duration")]
+    public async Task<IActionResult> GetAverageChatDuration([FromQuery] string? website = null)
+    {
+        List<UserProfile> users = new List<UserProfile>();
+        if (!string.IsNullOrEmpty(website))
+        {
+            var query = new QueryDefinition("SELECT * FROM c WHERE c.website = @website")
+                .WithParameter("@website", website);
+            using var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                users.AddRange(response);
+            }
+        }
+        else
+        {
+            var query = new QueryDefinition("SELECT * FROM c");
+            using var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                users.AddRange(response);
+            }
+        }
+        var durations = users
+            .Where(u => u.ChatHistory != null && u.ChatHistory.Count >= 2)
+            .Select(u => {
+                var ordered = u.ChatHistory.OrderBy(m => m.Timestamp).ToList();
+                return (int)(ordered.Last().Timestamp - ordered.First().Timestamp).TotalSeconds;
+            })
+            .Where(seconds => seconds > 0)
+            .ToList();
+        int avgSeconds = durations.Count > 0 ? (int)durations.Average() : 0;
+        string formatted = FormatDuration(avgSeconds);
+        return Ok(new { averageDurationSeconds = avgSeconds, formatted, count = durations.Count });
+    }
+
+    private static string FormatDuration(int totalSeconds)
+    {
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+        if (minutes > 0)
+            return $"{minutes}m {seconds}s";
+        return $"{seconds}s";
+    }
 } 
