@@ -125,23 +125,25 @@ public class AnalyticsController : ControllerBase
             // Handle registration click event
             if (analyticsEvent.EventType == "registration")
             {
-                // Always update profileInfo stats, even if chat was not started
+                // Only set profileInfoStats[profileInfo] to true if not already set
                 if (!string.IsNullOrEmpty(profileInfo))
                 {
-                    daily.ProfileInfoStats ??= new Dictionary<string, int>();
+                    daily.ProfileInfoStats ??= new Dictionary<string, bool>();
                     if (!daily.ProfileInfoStats.ContainsKey(profileInfo))
-                        daily.ProfileInfoStats[profileInfo] = 0;
-                    daily.ProfileInfoStats[profileInfo]++;
+                        daily.ProfileInfoStats[profileInfo] = true;
                 }
-                // Always update sessionData for registration
-                sessionData.RegistrationClickTime = now;
-                if (sessionData.ChatStartTime != default)
+                // Only set registrationClickTime and chatToRegistrationSeconds if not already set
+                if (sessionData.RegistrationClickTime == null || sessionData.RegistrationClickTime == default)
                 {
-                    sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
-                }
-                else
-                {
-                    sessionData.ChatToRegistrationSeconds = 0;
+                    sessionData.RegistrationClickTime = now;
+                    if (sessionData.ChatStartTime != default)
+                    {
+                        sessionData.ChatToRegistrationSeconds = (now - sessionData.ChatStartTime).TotalSeconds;
+                    }
+                    else
+                    {
+                        sessionData.ChatToRegistrationSeconds = 0;
+                    }
                 }
             }
 

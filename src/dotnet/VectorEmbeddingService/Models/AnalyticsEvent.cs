@@ -26,7 +26,7 @@ public class DailyAnalytics
     public HashSet<string> UniqueSessions { get; set; } = new();
 
     [JsonPropertyName("profileInfoStats")]
-    public Dictionary<string, int> ProfileInfoStats { get; set; } = new();
+    public Dictionary<string, bool> ProfileInfoStats { get; set; } = new();
 
     [JsonPropertyName("sessionData")]
     public Dictionary<string, SessionData> SessionData { get; set; } = new();
