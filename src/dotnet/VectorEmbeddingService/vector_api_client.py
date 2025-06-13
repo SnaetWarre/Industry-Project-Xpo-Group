@@ -3,6 +3,7 @@ import json
 from typing import List, Dict, Optional
 import logging
 import time
+import os
 
 class VectorApiClient:
     def __init__(self, base_url: str = "http://localhost:5000", default_container: str = "ffd"):
@@ -21,6 +22,26 @@ class VectorApiClient:
             'Accept': 'application/json'
         })
         self.logger = logging.getLogger(__name__)
+        self.jwt = None
+        self._login_and_set_jwt()
+
+    def _login_and_set_jwt(self):
+        username = os.environ.get("UPLOAD_SERVICE_USERNAME")
+        password = os.environ.get("UPLOAD_SERVICE_PASSWORD")
+        if not username or not password:
+            raise RuntimeError("UPLOAD_SERVICE_USERNAME and UPLOAD_SERVICE_PASSWORD must be set as environment variables.")
+        login_url = f"{self.base_url}/api/auth/login"
+        try:
+            resp = self.session.post(login_url, json={"username": username, "password": password}, verify=False)
+            resp.raise_for_status()
+            token = resp.json().get("token")
+            if not token:
+                raise RuntimeError(f"Login failed: No token returned. Response: {resp.text}")
+            self.jwt = token
+            self.session.headers.update({"Authorization": f"Bearer {self.jwt}"})
+            self.logger.info("Successfully authenticated and set JWT header.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to authenticate with API: {e}")
 
     def search_events(self, query: str, top_k: int = 5, threshold: float = 0.7, container: Optional[str] = None) -> List[Dict]:
         """
@@ -149,7 +170,7 @@ class VectorApiClient:
     def upload_event_with_retry(self, event, url, max_retries=3, backoff=2):
         for attempt in range(max_retries):
             try:
-                response = requests.post(url, json={"events": [event]}, verify=False)
+                response = self.session.post(url, json={"events": [event]}, verify=False)
                 if response.status_code == 200:
                     result = response.json()
                     successful_upserts = result.get("successfulUpserts", 0)

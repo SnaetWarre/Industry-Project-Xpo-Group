@@ -145,6 +145,11 @@ public class ChatController : ControllerBase
     private static readonly object _contextDocLock = new();
     private const int ContextDocCacheMaxSize = 20;
 
+    private static readonly ConcurrentDictionary<string, (int Count, DateTime Date)> _userDailyCounts = new();
+    private static (int Count, DateTime Date) _globalDailyCount = (0, DateTime.UtcNow.Date);
+    private const int MaxUserRequestsPerDay = 20;
+    private const int MaxGlobalRequestsPerDay = 2000;
+
     public ChatController(
         CosmosClient cosmosClient,
         IEmbeddingService embeddingService,
@@ -164,9 +169,49 @@ public class ChatController : ControllerBase
         _openAIClient = new OpenAIClient(new Uri(chatEndpoint), new AzureKeyCredential(chatApiKey));
     }
 
+    private bool IsUserRateLimitExceeded(string sessionId)
+    {
+        var today = DateTime.UtcNow.Date;
+        var entry = _userDailyCounts.GetOrAdd(sessionId, (0, today));
+        if (entry.Date != today)
+        {
+            _userDailyCounts[sessionId] = (1, today);
+            return false;
+        }
+        if (entry.Count >= MaxUserRequestsPerDay)
+        {
+            _logger.LogWarning($"User rate limit exceeded for session {sessionId}");
+            return true;
+        }
+        _userDailyCounts[sessionId] = (entry.Count + 1, today);
+        return false;
+    }
+
+    private bool IsGlobalRateLimitExceeded()
+    {
+        var today = DateTime.UtcNow.Date;
+        if (_globalDailyCount.Date != today)
+        {
+            _globalDailyCount = (1, today);
+            return false;
+        }
+        if (_globalDailyCount.Count >= MaxGlobalRequestsPerDay)
+        {
+            _logger.LogWarning($"Global chat rate limit exceeded");
+            return true;
+        }
+        _globalDailyCount = (_globalDailyCount.Count + 1, today);
+        return false;
+    }
+
     [HttpPost]
     public async Task<ActionResult<object>> Chat([FromBody] ChatRequest request)
     {
+        var sessionId = request.SessionId ?? HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (IsUserRateLimitExceeded(sessionId))
+            return StatusCode(429, "User daily chat limit reached");
+        if (IsGlobalRateLimitExceeded())
+            return StatusCode(429, "Global daily chat limit reached");
         _logger.LogInformation("Chat endpoint hit");
         try
         {
@@ -191,7 +236,6 @@ public class ChatController : ControllerBase
                 return BadRequest("Invalid input after sanitization");
 
             // Get or initialize conversation history for this session
-            var sessionId = request.SessionId ?? ipAddress;
             if (!_conversationHistory.TryGetValue(sessionId, out var history))
             {
                 history = new List<ChatMessage>();

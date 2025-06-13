@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy your code
+COPY src/ ./src/
+COPY run_pipeline.sh ./run_pipeline.sh
+
+RUN chmod +x ./run_pipeline.sh
+
+# Set environment variables (override in Azure)
+ENV UPLOAD_SERVICE_USERNAME=..
+ENV UPLOAD_SERVICE_PASSWORD=..
+ENV API_URL=..
+
+CMD ["./run_pipeline.sh"]
