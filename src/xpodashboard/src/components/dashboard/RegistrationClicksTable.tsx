@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Download, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
-import RegistrationClicksService from '@/lib/services/analytics/registrationClicksService';
+import RegistrationClicksService from '@/lib/services/dashboard/registrationClicksService';
+import ChatDetail from '@/components/chatgeschiedenis/ChatDetail';
 
 interface TableRow {
   id: string;
@@ -12,7 +13,11 @@ interface TableRow {
   gespreksDuur: string;
 }
 
-const RegistrationClicksTable = () => {
+interface RegistrationClicksTableProps {
+  onSelectSessionId: (sessionId: string) => void;
+}
+
+const RegistrationClicksTable = ({ onSelectSessionId }: RegistrationClicksTableProps) => {
   const [registrationClicks, setRegistrationClicks] = useState<TableRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,14 +46,58 @@ const RegistrationClicksTable = () => {
       await RegistrationClicksService.downloadCSV();
     } catch (err) {
       console.error('Error downloading CSV:', err);
-      // You might want to show an error message to the user here
     } finally {
       setIsDownloading(false);
     }
   };
 
+  // Skeleton loader component
+  const Skeleton = ({ className = '' }) => (
+    <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  );
+
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl text-black">Registratie kliks</h2>
+            <Skeleton className="h-6 w-6" />
+          </div>
+          <button 
+            disabled
+            className="inline-flex items-center gap-2 text-black border border-black px-4 py-2 rounded-lg opacity-50 cursor-not-allowed"
+          >
+            <Download className="h-5 w-5" />
+            Download CSV
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full bg-white rounded-xl">
+            <thead>
+              <tr>
+                <th className="py-4 px-6 text-left text-xs font-bold text-black uppercase"><Skeleton className="h-4 w-24" /></th>
+                <th className="py-4 px-6 text-left text-xs font-bold text-black uppercase"><Skeleton className="h-4 w-32" /></th>
+                <th className="py-4 px-6 text-left text-xs font-bold text-black uppercase"><Skeleton className="h-4 w-24" /></th>
+                <th className="py-4 px-6 text-left text-xs font-bold text-black uppercase"><Skeleton className="h-4 w-24" /></th>
+                <th className="py-4 px-6 w-10"><Skeleton className="h-4 w-10" /></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-150">
+              {[...Array(8)].map((_, i) => (
+                <tr key={i} className="border-b border-neutral-150 hover:bg-gray-50 cursor-pointer duration-200 transition-all">
+                  <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                  <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-32" /></td>
+                  <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                  <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                  <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-10" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -76,7 +125,7 @@ const RegistrationClicksTable = () => {
         <table className="w-full bg-white rounded-xl">
           <thead>
             <tr>
-              <th scope="col" className="py-4 px-6 text-left text-xs font-bold text-black uppercase">#</th>
+              <th scope="col" className="py-4 px-6 text-left text-xs font-bold text-black uppercase">ID</th>
               <th scope="col" className="py-4 px-6 text-left text-xs font-bold text-black uppercase">ProfielInfo</th>
               <th scope="col" className="py-4 px-6 text-left text-xs font-bold text-black uppercase">Klikdatum</th>
               <th scope="col" className="py-4 px-6 text-left text-xs font-bold text-black uppercase">Gespreksduur</th>
@@ -87,9 +136,10 @@ const RegistrationClicksTable = () => {
             {registrationClicks.map((click) => (
               <tr 
                 key={click.id} 
-                className="border-b border-neutral-150 hover:bg-gray-50"
+                className="border-b border-neutral-150 hover:bg-gray-50 cursor-pointer duration-200 transition-all"
+                onClick={() => onSelectSessionId(click.id.trim())}
               >
-                <td className="py-6 px-6 text-sm text-black">{click.id}</td>
+                <td className="py-6 px-6 text-sm text-black">{click.id.trim()}</td>
                 <td className="py-6 px-6 text-sm text-black">{click.profielInfo}</td>
                 <td className="py-6 px-6 text-sm text-black">
                   {new Date(click.date).toLocaleDateString('nl-BE', {
@@ -100,12 +150,13 @@ const RegistrationClicksTable = () => {
                 </td>
                 <td className="py-6 px-6 text-sm text-black">{click.gespreksDuur}</td>
                 <td className="py-6 px-6">
-                  <Link 
-                    href={`/chatgeschiedenis/${click.id}`}
+                  <button
+                    onClick={e => { e.stopPropagation(); onSelectSessionId(click.id.trim()); }}
                     className="hover:bg-red-10/10 p-2 rounded-full transition-all duration-300 cursor-pointer inline-flex"
+                    title="Bekijk chatgeschiedenis"
                   >
                     <ArrowUpRight className="h-4 w-4 text-black" />
-                  </Link>
+                  </button>
                 </td>
               </tr>
             ))}

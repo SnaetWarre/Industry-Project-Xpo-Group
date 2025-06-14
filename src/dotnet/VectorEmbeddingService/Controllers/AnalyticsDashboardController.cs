@@ -88,6 +88,27 @@ public class AnalyticsDashboardController : ControllerBase
                 analytics.AddRange(response);
             }
         }
+
+        // Haal alle userProfiles op voor deze website
+        var userProfileQuery = new QueryDefinition("SELECT c.sessionId, c.profileInfo FROM c WHERE c.website = @website")
+            .WithParameter("@website", website);
+        var userProfiles = new List<UserProfile>();
+        using (var iterator = _userProfilesContainer.GetItemQueryIterator<UserProfile>(userProfileQuery))
+        {
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                userProfiles.AddRange(response);
+            }
+        }
+        // Maak een dictionary voor snelle lookup: profileInfo (lowercase, trim) -> sessionId
+        var profileInfoToSessionId = userProfiles
+            .Where(u => !string.IsNullOrEmpty(u.ProfileInfo) && !string.IsNullOrEmpty(u.SessionId))
+            .ToDictionary(
+                u => u.ProfileInfo.Trim().ToLower(),
+                u => u.SessionId
+            );
+
         var result = new List<object>();
         foreach (var a in analytics)
         {
@@ -97,22 +118,26 @@ public class AnalyticsDashboardController : ControllerBase
                 {
                     foreach (var (profileInfo, clicked) in day.ProfileInfoStats)
                     {
-                        // Zoek de sessie voor deze profileInfo
+                        // Zoek de sessie voor deze profileInfo (case-insensitive, trim)
                         double? chatToRegistrationSeconds = null;
                         if (day.SessionData != null)
                         {
-                            var session = day.SessionData.Values.FirstOrDefault(s => s.ProfileInfo == profileInfo);
+                            var session = day.SessionData.Values.FirstOrDefault(s =>
+                                s.ProfileInfo != null && s.ProfileInfo.Trim().ToLower() == profileInfo.Trim().ToLower());
                             if (session != null)
                             {
                                 chatToRegistrationSeconds = session.ChatToRegistrationSeconds;
                             }
                         }
+                        if (chatToRegistrationSeconds == null)
+                            chatToRegistrationSeconds = 0;
                         result.Add(new
                         {
                             profileInfo,
                             date,
                             count = clicked ? 1 : 0,
-                            chatToRegistrationSeconds
+                            chatToRegistrationSeconds,
+                            sessionId = profileInfoToSessionId.TryGetValue(profileInfo.Trim().ToLower(), out var sid) ? sid : null
                         });
                     }
                 }
@@ -187,6 +212,7 @@ public class AnalyticsDashboardController : ControllerBase
     [HttpGet("users")]
     public async Task<IActionResult> GetUserProfiles([FromQuery] string website)
     {
+        // 1. Haal alle profielen op
         var query = new QueryDefinition("SELECT * FROM c WHERE c.website = @website")
             .WithParameter("@website", website);
         var users = new List<UserProfile>();
@@ -198,10 +224,35 @@ public class AnalyticsDashboardController : ControllerBase
                 users.AddRange(response);
             }
         }
+
+        // 2. Haal alle registration clicks op voor deze website (over alle weken)
+        var analyticsQuery = new QueryDefinition("SELECT * FROM c WHERE c.website = @website")
+            .WithParameter("@website", website);
+        var analytics = new List<WeeklyAnalytics>();
+        using (var iterator = _analyticsContainer.GetItemQueryIterator<WeeklyAnalytics>(analyticsQuery))
+        {
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                analytics.AddRange(response);
+            }
+        }
+        var clickedProfileInfos = new HashSet<string>(
+            analytics.SelectMany(a => a.Days.Values)
+                .Where(day => day.ProfileInfoStats != null)
+                .SelectMany(day => day.ProfileInfoStats)
+                .Where(kv => kv.Value)
+                .Select(kv => kv.Key.Trim().ToLower())
+        );
+
+        // 3. Combineer en return
         var result = users.Select(u => new
         {
+            Id = u.SessionId,
+            SessionId = u.SessionId,
             ProfileInfo = u.ProfileInfo,
-            u.CreatedAt
+            u.CreatedAt,
+            Geklikt = clickedProfileInfos.Contains(u.ProfileInfo.Trim().ToLower())
         });
         return Ok(result);
     }

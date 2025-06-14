@@ -5,6 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bell, Search, LayoutDashboard, MessageSquare } from 'lucide-react';
+import AuthService from '@/lib/services/auth/authService';
+import { useSiteFilter } from '@/context/SiteFilterContext';
+import CustomDropdown from './CustomDropdown';
 
 interface NavProps {
   children: React.ReactNode;
@@ -14,9 +17,14 @@ const Nav = ({ children }: NavProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<{ name: string; role: string; username: string } | null>(null);
+  const { site, setSite } = useSiteFilter();
 
   useEffect(() => {
     setMounted(true);
+    AuthService.getCurrentUser()
+      .then(data => setUser(data))
+      .catch(() => setUser(null));
   }, []);
 
   const isActive = (path: string) => {
@@ -55,6 +63,11 @@ const Nav = ({ children }: NavProps) => {
     );
   };
 
+  // Skeleton loader component
+  const Skeleton = ({ className = '' }) => (
+    <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  );
+
   return (
     <div className="flex">
       {/* Sidebar Navigation */}
@@ -75,45 +88,30 @@ const Nav = ({ children }: NavProps) => {
       {/* Top Navigation and Main Content */}
       <div className="flex-1 ml-64">
         <div className="h-16 bg-white flex items-center justify-between px-6 border-b">
-          {/* Search Bar */}
-          <div className="flex-1 max-w-2xl">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-10 text-black"
-              />
-            </div>
-          </div>
-
-          {/* Right Side Items */}
-          <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <button className="relative p-2 hover:bg-gray-100 rounded-full">
-              <Bell className="h-6 w-6 text-gray-600" />
-              <span className="absolute top-1 right-1 h-4 w-4 bg-red-10 rounded-full text-xs text-white flex items-center justify-center">
-                2
-              </span>
-            </button>
-
-            {/* User Profile */}
-            <div className="flex items-center space-x-3">
-              <div className="h-8 w-8 rounded-full overflow-hidden">
-                <Image
-                  src="/images/nav/pfp.webp"
-                  alt="User Avatar"
-                  width={32}
-                  height={32}
-                  className="object-cover w-full h-full"
-                />
-              </div>
-              <div className="text-sm">
-                <p className="font-medium text-gray-700">Jonas Naessens</p>
-                <p className="text-gray-500">Admin</p>
-              </div>
+          <div className="flex items-center space-x-3 ml-auto">
+            <CustomDropdown
+              value={
+                site === 'all' ? 'Alle sites' : site.charAt(0).toUpperCase() + site.slice(1)
+              }
+              options={['Alle sites', 'Ffd', 'Abiss', 'Artisan']}
+              onChange={(_, index) => {
+                const values = ['all', 'ffd', 'abiss', 'artisan'];
+                setSite(values[index] as any);
+              }}
+            />
+            <div className="text-sm text-right">
+              {user === null && (
+                <>
+                  <Skeleton className="h-5 w-32 mb-1" />
+                  <Skeleton className="h-4 w-16" />
+                </>
+              )}
+              {user && (
+                <>
+                  <p className="font-medium text-gray-700">{user.name}</p>
+                  <p className="text-gray-500">{user.role}</p>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -13,92 +13,144 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CustomDropdown from '@/components/core/CustomDropdown';
+import { getTotalMessages } from '@/lib/services/chatgeschiedenis/totalMessagesService';
+import { getAverageChatDuration } from '@/lib/services/chatgeschiedenis/averageChatDurationService';
+import { getTotalChats } from '@/lib/services/chatgeschiedenis/totalChatsService';
+import { getUserProfiles, UserProfile } from '@/lib/services/chatgeschiedenis/userProfilesService';
+import ChatDetail from './ChatDetail';
+import { useSiteFilter } from '@/context/SiteFilterContext';
 
-type ChatEntry = {
-  id: string;
-  bedrijf: string;
-  functie: string;
-  date: string;
-  beurs: string;
-  status: 'completed' | 'rejected';
-};
+const WEBSITE = 'ffd'; // Of maak dit dynamisch/selecteerbaar
 
-const data: ChatEntry[] = [
-  { id: '00001', bedrijf: 'Howest', functie: 'Student', date: '04 Sep 2019', beurs: 'Flor', status: 'completed' },
-  { id: '00002', bedrijf: 'Tapijtfirma', functie: 'Innovation functie', date: '28 May 2019', beurs: 'Flor', status: 'rejected' },
-  { id: '00003', bedrijf: 'Darrell Caldwell', functie: '8587 Frida Ports', date: '23 Nov 2019', beurs: 'Abiss', status: 'rejected' },
-  { id: '00004', bedrijf: 'Gilbert Johnston', functie: '768 Destiny Lake Suite 600', date: '05 Feb 2019', beurs: 'Abiss', status: 'completed' },
-  { id: '00005', bedrijf: 'Alan Cain', functie: '042 Mylene Throughway', date: '29 Jul 2019', beurs: 'Artisan', status: 'rejected' },
-  { id: '00006', bedrijf: 'Alfred Murray', functie: '543 Weimann Mountain', date: '15 Aug 2019', beurs: 'Artisan', status: 'completed' },
-  { id: '00007', bedrijf: 'Maggie Sullivan', functie: 'New Scottieberg', date: '21 Dec 2019', beurs: 'Artisan', status: 'completed' },
-  { id: '00008', bedrijf: 'Rosie Todd', functie: 'New Jon', date: '30 Apr 2019', beurs: 'Artisan', status: 'rejected' },
-  { id: '00009', bedrijf: 'Dollie Hines', functie: '124 Lyla Forge Suite 975', date: '09 Jan 2019', beurs: 'Artisan', status: 'completed' },
-];
-
-const columnHelper = createColumnHelper<ChatEntry>();
+const columnHelper = createColumnHelper<UserProfile & { id: string; beurs: string }>();
 
 const columns = [
   columnHelper.accessor('id', {
     header: 'ID',
     cell: (info) => info.getValue(),
+    enableColumnFilter: false,
   }),
-  columnHelper.accessor('bedrijf', {
-    header: 'BEDRIJF',
+  columnHelper.accessor('profileInfo', {
+    header: 'PROFIELINFO',
     cell: (info) => info.getValue(),
+    enableColumnFilter: false,
   }),
-  columnHelper.accessor('functie', {
-    header: 'FUNCTIE',
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor('date', {
+  columnHelper.accessor('createdAt', {
     header: 'DATE',
-    cell: (info) => (
-      <div className="text-black flex gap-1">
-        <span>{info.getValue().split(' ')[0]}</span>
-        <span>{info.getValue().split(' ')[1]}</span>
-        <span>{info.getValue().split(' ')[2]}</span>
-      </div>
-    ),
+    cell: (info) => {
+      const date = new Date(info.getValue());
+      return `${date.toLocaleDateString('nl-BE', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    },
+    filterFn: (row, columnId, filterValue) => {
+      const date = new Date(row.getValue(columnId)).toLocaleDateString('nl-BE', { day: '2-digit', month: 'short', year: 'numeric' });
+      return !filterValue || date === filterValue;
+    },
   }),
   columnHelper.accessor('beurs', {
     header: 'BEURS',
     cell: (info) => info.getValue(),
+    filterFn: (row, columnId, filterValue) => {
+      return !filterValue || row.getValue(columnId) === filterValue;
+    },
   }),
-  columnHelper.accessor('status', {
+  columnHelper.accessor('geklikt', {
     header: 'GEKLIKT',
     cell: (info) => (
       <span
         className={`px-3 py-1 rounded-md text-xs inline-block text-center w-24 ${
-          info.getValue() === 'completed'
-            ? 'bg-emerald-100 text-emerald-700'
-            : 'bg-red-100 text-red-700'
+          info.getValue() ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
         }`}
       >
-        {info.getValue() === 'completed' ? 'Voltooid' : 'Geweigerd'}
+        {info.getValue() ? 'Voltooid' : 'Niet geklikt'}
       </span>
     ),
+    filterFn: (row, columnId, filterValue) => {
+      const label = row.getValue(columnId) ? 'Voltooid' : 'Niet geklikt';
+      return !filterValue || label === filterValue;
+    },
   }),
-] as ColumnDef<ChatEntry>[];
+] as ColumnDef<UserProfile & { id: string; beurs: string }>[];
+
+// Skeleton loader component
+const Skeleton = ({ className = '' }) => (
+  <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+);
 
 const ChatHistory = () => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [profiles, setProfiles] = useState<(UserProfile & { id: string; beurs: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalMessages, setTotalMessages] = useState<number>(0);
+  const [averageDuration, setAverageDuration] = useState<string>('...');
+  const [totalChats, setTotalChats] = useState<number | null>(null);
   const [dateFilter, setDateFilter] = useState<string>('');
   const [beursFilter, setBeursFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [isDateOpen, setIsDateOpen] = useState(false);
-  const [isBeursOpen, setIsBeursOpen] = useState(false);
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [gekliktFilter, setGekliktFilter] = useState<string>('');
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const { site } = useSiteFilter();
 
-  // Get unique values for filters
-  const uniqueDates = Array.from(new Set(data.map(item => item.date.split(' ')[1])));
-  const uniqueBeurs = Array.from(new Set(data.map(item => item.beurs)));
-  const statusOptions = ['Completed', 'Rejected'];
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let websites: string[];
+        if (site === 'all') {
+          websites = ['ffd', 'abiss', 'artisan'];
+        } else {
+          websites = [site];
+        }
+        // Profielen van de geselecteerde websites ophalen en samenvoegen
+        const allProfiles = (
+          await Promise.all(
+            websites.map(async (website) => {
+              const profilesData = await getUserProfiles(website);
+              return profilesData.map((p) => ({
+                ...p,
+                id: p.id,
+                beurs: website,
+              }));
+            })
+          )
+        ).flat();
+
+        // Statistieken ophalen per site en aggregeren
+        const [totalMessagesArr, avgDurationArr, totalChatsArr] = await Promise.all([
+          Promise.all(websites.map(w => getTotalMessages(w))),
+          Promise.all(websites.map(w => getAverageChatDuration(w))),
+          Promise.all(websites.map(w => getTotalChats(w))),
+        ]);
+
+        const totalMessages = totalMessagesArr.reduce((sum, val) => sum + (val?.totalMessages || 0), 0);
+        const avgSecondsArr = avgDurationArr.map(d => d.averageDurationSeconds || 0);
+        const avgDuration = avgSecondsArr.length > 0
+          ? Math.round(avgSecondsArr.reduce((a, b) => a + b, 0) / avgSecondsArr.length)
+          : 0;
+        const avgDurationFormatted = avgDuration > 60
+          ? `${Math.floor(avgDuration / 60)}m ${avgDuration % 60}s`
+          : `${avgDuration}s`;
+        const totalChats = totalChatsArr.reduce((sum, val) => sum + (val || 0), 0);
+
+        setProfiles(allProfiles);
+        setTotalMessages(totalMessages);
+        setAverageDuration(avgDurationFormatted);
+        setTotalChats(totalChats);
+      } catch (err) {
+        setError('Er is een fout opgetreden bij het ophalen van de data.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [site]);
 
   const table = useReactTable({
-    data,
+    data: profiles,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -117,30 +169,69 @@ const ChatHistory = () => {
     sortDescFirst: true,
   });
 
-  const applyDateFilter = (value: string) => {
-    setDateFilter(value);
-    table.getColumn('date')?.setFilterValue(value);
-    setIsDateOpen(false);
-  };
-
-  const applyBeursFilter = (value: string) => {
-    setBeursFilter(value);
-    table.getColumn('beurs')?.setFilterValue(value);
-    setIsBeursOpen(false);
-  };
-
-  const applyStatusFilter = (value: string) => {
-    setStatusFilter(value);
-    table.getColumn('status')?.setFilterValue(value.toLowerCase());
-    setIsStatusOpen(false);
-  };
+  const uniqueDates = Array.from(new Set(profiles.map(item => new Date(item.createdAt).toLocaleDateString('nl-BE', { day: '2-digit', month: 'short', year: 'numeric' }))));
+  const uniqueBeurs = Array.from(new Set(profiles.map(item => item.beurs)));
+  const gekliktOptions = ['Voltooid', 'Niet geklikt'];
 
   const resetFilters = () => {
-    setDateFilter('');
-    setBeursFilter('');
-    setStatusFilter('');
-    table.resetColumnFilters();
+    table.getColumn('createdAt')?.setFilterValue(undefined);
+    table.getColumn('beurs')?.setFilterValue(undefined);
+    table.getColumn('geklikt')?.setFilterValue(undefined);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <h1 className="text-3xl font-bold text-black mb-6">Chatgeschiedenis</h1>
+        {/* Skeletons voor de statistieken */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          {[1, 2, 3].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-6">
+              <Skeleton className="h-4 w-32 mb-4" />
+              <div className="flex items-center justify-between mt-2">
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-10 w-10 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Skeleton voor de tabel */}
+        <div className="bg-white rounded-xl p-6">
+          <Skeleton className="h-6 w-48 mb-6" />
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border-none">
+              <thead>
+                <tr className="border-b border-neutral-150">
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-24" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-32" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-24" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-24" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-10" /></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-black">
+                {[...Array(8)].map((_, i) => (
+                  <tr key={i} className="border-b border-neutral-150 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors">
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-32" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-10" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) return <div className="text-red-500">{error}</div>;
+
+  if (selectedChatId) {
+    return <ChatDetail sessionId={selectedChatId} onBack={() => setSelectedChatId(null)} />;
+  }
 
   return (
     <div className="min-h-screen">
@@ -151,42 +242,30 @@ const ChatHistory = () => {
         <div className="bg-white rounded-xl p-6">
           <p className="text-sm text-black">Totale Chats</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-2xl font-bold text-black">156</p>
+            <p className="text-2xl font-bold text-black">{totalChats === null ? '...' : totalChats}</p>
             <div className="bg-blue-50 p-3 rounded-full">
               <MessageSquare className="h-6 w-6 text-blue-500" />
             </div>
-          </div>
-          <div className="flex items-center mt-4">
-            <span className="text-emerald-500 text-sm">↑ 12.5%</span>
-            <span className="text-black text-sm ml-1">Laatste 30 dagen</span>
           </div>
         </div>
         
         <div className="bg-white rounded-xl p-6">
           <p className="text-sm text-black">Gemiddelde Duur</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-2xl font-bold text-black">4m 12s</p>
+            <p className="text-2xl font-bold text-black">{averageDuration}</p>
             <div className="bg-green-50 p-3 rounded-full">
               <MessageSquare className="h-6 w-6 text-green-500" />
             </div>
-          </div>
-          <div className="flex items-center mt-4">
-            <span className="text-emerald-500 text-sm">↑ 3.2%</span>
-            <span className="text-black text-sm ml-1">Per gesprek</span>
           </div>
         </div>
         
         <div className="bg-white rounded-xl p-6">
           <p className="text-sm text-black">Berichten</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-2xl font-bold text-black">1,248</p>
+            <p className="text-2xl font-bold text-black">{totalMessages}</p>
             <div className="bg-purple-50 p-3 rounded-full">
               <MessageSquare className="h-6 w-6 text-purple-500" />
             </div>
-          </div>
-          <div className="flex items-center mt-4">
-            <span className="text-emerald-500 text-sm">↑ 8.1%</span>
-            <span className="text-black text-sm ml-1">Totaal verstuurd</span>
           </div>
         </div>
       </div>
@@ -194,8 +273,6 @@ const ChatHistory = () => {
       {/* Chat History Table */}
       <div className="bg-white rounded-xl p-6">
         <h2 className="text-xl font-semibold text-black mb-4">Recente Gesprekken</h2>
-        
-        {/* Filters */}
         <div className="bg-gray-50 rounded-lg p-4 mb-6 flex items-center gap-4">
           <div className="flex items-center gap-2 border-r border-neutral-150 pr-4">
             <Filter className="h-5 w-5 text-neutral-500" />
@@ -203,21 +280,24 @@ const ChatHistory = () => {
           </div>
           {/* Date Filter */}
           <CustomDropdown
-            value={dateFilter || 'Datum'}
+            value={String(table.getColumn('createdAt')?.getFilterValue() ?? '')}
             options={uniqueDates}
-            onChange={(value) => applyDateFilter(value)}
+            placeholder="Datum"
+            onChange={value => table.getColumn('createdAt')?.setFilterValue(value)}
           />
           {/* Beurs Filter */}
           <CustomDropdown
-            value={beursFilter || 'Beurs'}
+            value={String(table.getColumn('beurs')?.getFilterValue() ?? '')}
             options={uniqueBeurs}
-            onChange={(value) => applyBeursFilter(value)}
+            placeholder="Beurs"
+            onChange={value => table.getColumn('beurs')?.setFilterValue(value)}
           />
-          {/* Status Filter */}
+          {/* Geklikt Filter */}
           <CustomDropdown
-            value={statusFilter || 'Geklikt'}
-            options={statusOptions}
-            onChange={(value) => applyStatusFilter(value)}
+            value={String(table.getColumn('geklikt')?.getFilterValue() ?? '')}
+            options={gekliktOptions}
+            placeholder="Geklikt"
+            onChange={value => table.getColumn('geklikt')?.setFilterValue(value)}
           />
           <button 
             className="flex items-center gap-2 text-red-10 ml-auto cursor-pointer"
@@ -227,7 +307,6 @@ const ChatHistory = () => {
             <span>Filter resetten</span>
           </button>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full border-collapse border-none">
             <thead>
@@ -265,7 +344,7 @@ const ChatHistory = () => {
                 <tr 
                   key={row.id} 
                   className="border-b border-neutral-150 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => window.location.href = `/chatgeschiedenis/${row.original.id}`}
+                  onClick={() => setSelectedChatId(row.original.id)}
                 >
                   {row.getVisibleCells().map(cell => (
                     <td key={cell.id} className="py-6 px-6 text-sm text-black">

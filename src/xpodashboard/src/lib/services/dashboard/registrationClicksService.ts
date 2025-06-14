@@ -5,10 +5,12 @@ interface RegistrationClick {
   profileInfo: string;
   date: string;
   count: number;
+  chatToRegistrationSeconds?: number;
+  sessionId?: string;
 }
 
 interface TableRow {
-  id: string;
+  id: string; // sessionId
   profielInfo: string;
   date: string;
   gespreksDuur: string;
@@ -60,7 +62,13 @@ class RegistrationClicksService {
     const websites = ['ffd', 'abiss', 'artisan'];
     const weeks = this.getWeeksToFetch();
     const allClicks: TableRow[] = [];
-    let idCounter = 1;
+
+    function formatDuration(seconds: number | undefined): string {
+      if (typeof seconds !== 'number' || isNaN(seconds)) return '-';
+      const min = Math.floor(seconds / 60);
+      const sec = +(seconds % 60).toFixed(2);
+      return `${min > 0 ? min + ' min. ' : ''}${sec} sec`;
+    }
 
     try {
       // Fetch data for all websites and weeks
@@ -73,12 +81,11 @@ class RegistrationClicksService {
         if (Array.isArray(weekData)) {
           weekData.forEach((click: RegistrationClick) => {
             allClicks.push({
-              id: idCounter.toString().padStart(5, '0'),
+              id: click.sessionId || '-',
               profielInfo: click.profileInfo,
               date: click.date,
-              gespreksDuur: '2 min. 15 sec.', // Hardcoded as requested
+              gespreksDuur: formatDuration(click.chatToRegistrationSeconds),
             });
-            idCounter++;
           });
         }
       });

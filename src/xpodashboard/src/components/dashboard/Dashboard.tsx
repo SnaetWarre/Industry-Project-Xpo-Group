@@ -2,13 +2,15 @@
 
 import { MousePointerClick, Users, TrendingUp, Download, ArrowUpRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import DashboardService from '@/lib/services/analytics/dashboardService';
-import ChartService from '@/lib/services/analytics/chartService';
+import DashboardService from '@/lib/services/dashboard/dashboardService';
+import ChartService from '@/lib/services/dashboard/chartService';
 import type { DashboardOverview, ChartData } from '@/lib/types/analytics';
 import CustomDropdown from '@/components/core/CustomDropdown';
 import RegistrationClicksTable from './RegistrationClicksTable';
+import ChatDetail from '@/components/chatgeschiedenis/ChatDetail';
+import { useSiteFilter } from '@/context/SiteFilterContext';
 
 const MONTHS = [
   'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
@@ -41,6 +43,11 @@ const NoDataDisplay = () => (
   </div>
 );
 
+// Skeleton loader component
+const Skeleton = ({ className = '' }) => (
+  <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+);
+
 export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,15 +60,26 @@ export const Dashboard = () => {
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear] = useState(new Date().getFullYear());
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const scrollPosition = useRef<number>(0);
   const availableMonths = getAvailableMonths();
+  const { site } = useSiteFilter();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [overview, clicks] = await Promise.all([
-          DashboardService.getAllOverviewData(),
-          ChartService.getChartData(selectedYear, selectedMonth)
-        ]);
+        let overview, clicks;
+        if (site === 'all') {
+          [overview, clicks] = await Promise.all([
+            DashboardService.getAllOverviewData(),
+            ChartService.getChartData(selectedYear, selectedMonth)
+          ]);
+        } else {
+          [overview, clicks] = await Promise.all([
+            DashboardService.getOverview(site),
+            ChartService.getChartData(selectedYear, selectedMonth, site)
+          ]);
+        }
         setData(overview);
         setChartData(clicks);
         setError(null);
@@ -74,18 +92,90 @@ export const Dashboard = () => {
     };
 
     fetchData();
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, site]);
 
   const handleMonthChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedMonth(parseInt(event.target.value));
   };
 
+  const handleSelectSessionId = (sessionId: string) => {
+    scrollPosition.current = window.scrollY;
+    setSelectedSessionId(sessionId);
+  };
+
+  const handleBack = () => {
+    setSelectedSessionId(null);
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition.current);
+    }, 0);
+  };
+
   if (loading) {
-    return <div className='text-black/50'>Loading...</div>;
+    return (
+      <div className="min-h-screen">
+        <h1 className="text-3xl font-bold text-black mb-6">Dashboard</h1>
+        {/* Skeletons voor de statistieken */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {[1, 2, 3].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-6">
+              <Skeleton className="h-4 w-32 mb-4" />
+              <div className="flex items-center gap-3 mt-1">
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-10 w-10 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Skeleton voor de grafiek */}
+        <div className="mb-12">
+          <div className="bg-white rounded-xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-8 w-32" />
+            </div>
+            <div className="h-[400px] flex items-center justify-center">
+              <Skeleton className="h-80 w-full" />
+            </div>
+          </div>
+        </div>
+        {/* Skeleton voor de tabel */}
+        <div className="bg-white rounded-xl p-6">
+          <Skeleton className="h-6 w-48 mb-6" />
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border-none">
+              <thead>
+                <tr className="border-b border-neutral-150">
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-24" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-32" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-24" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-24" /></th>
+                  <th className="py-4 px-6 text-xs font-bold text-black"><Skeleton className="h-4 w-10" /></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-black">
+                {[...Array(8)].map((_, i) => (
+                  <tr key={i} className="border-b border-neutral-150 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors">
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-32" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-24" /></td>
+                    <td className="py-6 px-6 text-sm text-black"><Skeleton className="h-4 w-10" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return <div className="text-red-500">{error}</div>;
+  }
+
+  if (selectedSessionId) {
+    return <ChatDetail sessionId={selectedSessionId} onBack={handleBack} />;
   }
 
   return (
@@ -197,7 +287,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Registration Clicks Table */}
-      <RegistrationClicksTable />
+      <RegistrationClicksTable onSelectSessionId={handleSelectSessionId} />
     </div>
   );
 };

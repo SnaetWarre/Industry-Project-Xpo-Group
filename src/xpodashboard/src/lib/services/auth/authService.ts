@@ -63,6 +63,15 @@ class AuthService {
     this.token = null;
     localStorage.removeItem('jwt');
   }
+
+  static async getCurrentUser() {
+    const headers = await this.getHeaders();
+    const response = await axios.get(`${API_CONFIG.baseUrl}/api/auth/me`, {
+      headers,
+      withCredentials: true,
+    });
+    return response.data;
+  }
 }
 
 export default AuthService;
