@@ -1,136 +1,45 @@
 // FFD Bot JavaScript Module
 
-const FFD_CSS = `
-:root {
-  --ffd-color: #db6245;
-  --chat-width: 350px;
-  --chat-height: 600px;
-  --title-font: 'Ropa Sans', sans-serif;
-  --text-font: 'Open Sans', sans-serif;
-}
-.chatbot-container[data-website='ffd'] .chatbot-header,
-.chatbot-container[data-website='ffd'] .chatbot-launcher {
-  background-color: var(--ffd-color);
-}
-.chatbot-container[data-website='ffd'] .chatbot-bubble.user {
-  background-color: var(--ffd-color);
-  color: white;
-}
-.chatbot-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-  font-family: var(--text-font);
-}
-.chatbot-launcher {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-.chatbot-launcher img {
-  width: 32px;
-  height: 32px;
-  filter: brightness(0) invert(1);
-}
-.chatbot-window {
-  position: fixed;
-  bottom: 100px;
-  right: 20px;
-  width: var(--chat-width);
-  height: var(--chat-height);
-  background: white;
-  border-radius: 4px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.chatbot-header {
-  padding: 16px;
-  color: white;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.chatbot-header-title {
-  font-size: 20px;
-  font-weight: normal;
-  margin-right: auto;
-  font-family: var(--title-font);
-}
-.chatbot-messages {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #f5f5f5;
-  overflow-x: hidden !important;
-}
-.chatbot-bubble {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: white;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  line-height: 1.4;
-  font-size: 14px;
-  align-self: flex-start;
-}
-.bot-message-container img {
-  width: 24px;
-  height: 24px;
-  margin-top: 8px;
-  flex-shrink: 0;
-}
-.chatbot-container[data-website='ffd'] .bot-message-container img {
-  filter: brightness(0) saturate(100%) invert(45%) sepia(95%) saturate(385%)
-    hue-rotate(327deg) brightness(91%) contrast(92%);
-}
-.sticky-register-btn {
-  position: fixed;
-  bottom: 80px;
-  right: 20px;
-  background: var(--ffd-color);
-  color: #fff;
-  border: none;
-  border-radius: 20px;
-  padding: 10px 24px;
-  font-size: 15px;
-  font-family: var(--title-font);
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  z-index: 1100;
-  display: none;
-}
-.chatbot-container[data-website='ffd'] .sticky-register-btn {
-  background: var(--ffd-color);
-}
-`;
-
-function injectFFDCss() {
-  if (!document.getElementById('ffd-bot-css')) {
-    const style = document.createElement('style');
-    style.id = 'ffd-bot-css';
-    style.textContent = FFD_CSS;
-    document.head.appendChild(style);
-  }
-}
-
-const websiteConfig = {
-  botName: 'AI-beursassistent',
-  welcomeMessage:
-    'Hoi! Ik ben je beursassistent voor de vloeren- en isolatiebeurs. Ik kan je helpen met informatie over vloeren, isolatie en gerelateerde producten. Waar ben je naar op zoek?',
-};
-
+const BOT_NAME = 'AI-beursassistent';
+const WEBSITE = 'ffd';
 const API_URL = 'https://localhost:5001';
+
+function injectChatbotHtml() {
+  if (document.getElementById('chatbotLauncher')) return; // Already injected
+  const container = document.createElement('div');
+  container.className = 'chatbot-container';
+  container.dataset.website = WEBSITE;
+  container.innerHTML = `
+    <div class="chatbot-launcher-wrapper">
+      <div id="chatbotLauncher" class="chatbot-launcher" title="Open chatbot">
+        <span><img src="../images/robot.svg" alt="Bot" /></span>
+      </div>
+      <div id="chatbotLauncherLabel" class="chatbot-launcher-label">Stel een vraag</div>
+    </div>
+    <div id="chatbotWindow" class="chatbot-window" style="display:none;">
+      <div class="chatbot-header">
+        <img src="../images/robot.svg" alt="Bot" class="chatbot-header-icon" />
+        <span class="chatbot-header-title">${BOT_NAME}</span>
+        <button class="chatbot-close" id="chatbotClose" title="Sluiten">×</button>
+      </div>
+      <div class="chatbot-messages" id="chatbotMessages"></div>
+      <div class="privacy-disclaimer" id="privacyDisclaimer">
+        <small>
+          Door een chat te starten met de AI,
+          <span class="disclaimer-bold">ga je akkoord</span> met onze
+          <a href="gdpr.pdf" target="_blank" class="privacy-link">Privacyverklaring</a>.
+        </small>
+      </div>
+      <form class="chatbot-input-area" id="chatbotForm" autocomplete="off" style="display:none;">
+        <input class="chatbot-input" id="chatbotInput" type="text" placeholder="Schrijf een bericht" required />
+        <button class="chatbot-send" type="submit" title="Versturen">
+          <svg viewBox="0 0 24 24"><path d="M3 20L21 12L3 4V10L17 12L3 14V20Z" /></svg>
+        </button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(container);
+}
 
 function setSessionIdCookie(sessionId) {
   document.cookie = `chatbotSessionId=${sessionId}; path=/; SameSite=Lax`;
@@ -158,7 +67,7 @@ async function createUserProfile(sessionId, profileInfo) {
       body: JSON.stringify({
         sessionId: sessionId,
         profileInfo: profileInfo,
-        website: 'ffd',
+        website: WEBSITE,
       }),
     });
     if (!response.ok) throw new Error('Failed to create user profile');
@@ -264,13 +173,13 @@ function renderMessages(messages) {
       container.className = 'bot-message-container';
       if (isFirstOfGroup) container.classList.add('first-of-group');
       const img = document.createElement('img');
-      img.src = 'images/robot.svg';
+      img.src = '../images/robot.svg';
       img.alt = 'Bot';
       const messageWrapper = document.createElement('div');
       messageWrapper.className = 'message-wrapper';
       const botName = document.createElement('div');
       botName.className = 'bot-name';
-      botName.textContent = websiteConfig.botName;
+      botName.textContent = BOT_NAME;
       const bubble = document.createElement('div');
       bubble.className = 'chatbot-bubble';
       bubble.innerHTML = parseMarkdown(msg.text);
@@ -448,7 +357,7 @@ function showTypingIndicator(messages) {
   typingIndicator.className = 'typing-indicator';
   typingIndicator.id = 'typingIndicator';
   const img = document.createElement('img');
-  img.src = 'images/robot.svg';
+  img.src = '../../images/robot.svg';
   img.alt = 'Bot';
   const bubble = document.createElement('div');
   bubble.className = 'typing-bubble';
@@ -494,8 +403,35 @@ async function updateStickyRegisterButton() {
     : 'none';
 }
 
+function initializeWebsite(messages, form) {
+  const now = new Date();
+  const timeString = now.toLocaleTimeString('nl-NL', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  messages.innerHTML = `
+    <div class="bot-message-container">
+      <img src="../images/robot.svg" alt="Bot">
+      <div class="message-wrapper">
+        <div class="bot-name">${BOT_NAME}</div>
+        <div class="chatbot-bubble">
+          Hoi! Ik ben je AI-beursassistent, ik kan je gepersonaliseerde informatie bezorgen over het event. Wat is jouw functietitel en bedrijfsnaam?
+        </div>
+        <div class="timestamp">${timeString}</div>
+      </div>
+    </div>
+    <div class="privacy-link-container" style="text-align:right;margin-top:8px;">
+      <a href="gdpr.pdf" target="_blank" class="privacy-link" style="font-size:12px;opacity:0.7;">Privacyverklaring</a>
+    </div>
+  `;
+  form.style.display = '';
+  registrationStep = true;
+  allMessages = [];
+  lastRenderedScrollToBottom = true;
+}
+
 function initFFDBot() {
-  injectFFDCss();
+  injectChatbotHtml();
   document.addEventListener('DOMContentLoaded', () => {
     const launcher = document.getElementById('chatbotLauncher');
     const launcherLabel = document.getElementById('chatbotLauncherLabel');
@@ -505,11 +441,10 @@ function initFFDBot() {
     const input = document.getElementById('chatbotInput');
     const messages = document.getElementById('chatbotMessages');
     const headerTitle = document.querySelector('.chatbot-header-title');
-    const disclaimer = document.getElementById('chatbotDisclaimer');
-    const disclaimerClose = document.getElementById('disclaimerClose');
+    const disclaimer = document.getElementById('privacyDisclaimer');
     const chatbotContainer = document.querySelector('.chatbot-container');
-    chatbotContainer.dataset.website = 'ffd';
-    headerTitle.textContent = websiteConfig.botName;
+    chatbotContainer.dataset.website = WEBSITE;
+    headerTitle.textContent = BOT_NAME;
     // Add sticky register button
     const header = document.querySelector('.chatbot-header');
     let registerBtn = document.createElement('button');
@@ -531,47 +466,31 @@ function initFFDBot() {
           }
         } catch (e) {}
       }
-      await trackAnalyticsEvent('registration', { sessionId, website: 'ffd', profileInfo });
+      await trackAnalyticsEvent('registration', { sessionId, website: WEBSITE, profileInfo });
       window.open('https://ffd25.registration.xpogroup.com/invitation', '_blank');
     };
-    // Disclaimer close
-    if (disclaimerClose) {
-      disclaimerClose.onclick = () => {
-        disclaimer.classList.add('hidden');
-      };
-    }
     // Initialize chat window
-    function initializeWebsite() {
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('nl-NL', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      messages.innerHTML = `
-        <div class="bot-message-container">
-          <img src="images/robot.svg" alt="Bot">
-          <div class="message-wrapper">
-            <div class="bot-name">${websiteConfig.botName}</div>
-            <div class="chatbot-bubble">
-              Hoi! Ik ben je AI-beursassistent, ik kan je gepersonaliseerde informatie bezorgen over het event. Wat is jouw functietitel en bedrijfsnaam?
-            </div>
-            <div class="timestamp">${timeString}</div>
-          </div>
-        </div>
-        <div class="privacy-link-container" style="text-align:right;margin-top:8px;">
-          <a href="gdpr.pdf" target="_blank" class="privacy-link" style="font-size:12px;opacity:0.7;">Privacyverklaring</a>
-        </div>
-      `;
-      form.style.display = '';
-      registrationStep = true;
-      allMessages = [];
-      lastRenderedScrollToBottom = true;
+    function localInitializeWebsite() {
+      initializeWebsite(messages, form);
     }
     // Form submit logic
     form.onsubmit = async (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
+      const privacyDisclaimer = document.getElementById('privacyDisclaimer');
+      if (privacyDisclaimer) {
+        privacyDisclaimer.innerHTML =
+          '<a href="gdpr.pdf" target="_blank" class="privacy-link" style="display:block;text-align:right;font-size:12px;opacity:0.7;margin:0 8px 0 0;">Privacyverklaring</a>';
+        privacyDisclaimer.style.background = 'transparent';
+        privacyDisclaimer.style.padding = '0';
+        privacyDisclaimer.style.margin = '0';
+        privacyDisclaimer.style.borderRadius = '0';
+        privacyDisclaimer.style.boxShadow = 'none';
+        privacyDisclaimer.style.minHeight = 'unset';
+        privacyDisclaimer.style.background = '#f5f5f5';
+        privacyDisclaimer.style.paddingBottom = '8px';
+      }
       const sendingMsg = {
         text,
         isUser: true,
@@ -597,7 +516,7 @@ function initFFDBot() {
           sid = data.sessionId;
         }
         await createUserProfile(sid, text);
-        await trackAnalyticsEvent('chat_start', { sessionId: sid, website: 'ffd', profileInfo: text });
+        await trackAnalyticsEvent('chat_start', { sessionId: sid, website: WEBSITE, profileInfo: text });
         allMessages = allMessages.filter((m) => !m.sending);
         addMessage(text, true, {}, messages);
         setTimeout(() => {
@@ -614,7 +533,7 @@ function initFFDBot() {
         const response = await fetch(`${API_URL}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: text, website: 'ffd', sessionId }),
+          body: JSON.stringify({ query: text, website: WEBSITE, sessionId }),
         });
         if (!response.ok) throw new Error('Network response was not ok');
         const data = await response.json();
@@ -665,12 +584,12 @@ function initFFDBot() {
       if (await hasRegistered()) {
         const valid = await ensureValidSession();
         if (!valid) {
-          initializeWebsite();
+          localInitializeWebsite();
           return;
         }
       }
       if (!(await hasRegistered())) {
-        initializeWebsite();
+        localInitializeWebsite();
       } else {
         trackAnalyticsEvent('chat_start', {});
         form.style.display = '';
@@ -685,10 +604,12 @@ function initFFDBot() {
     // Initialize if already registered
     (async () => {
       if (await hasRegistered()) {
-        initializeWebsite();
+        localInitializeWebsite();
       }
     })();
   });
 }
 
-export default initFFDBot; 
+// At the top-level, inject HTML, then initialize
+injectChatbotHtml();
+initFFDBot(); 
