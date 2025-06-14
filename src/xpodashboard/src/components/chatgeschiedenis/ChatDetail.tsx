@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getChatHistory } from '@/lib/services/chatgeschiedenis/chatHistoryService';
 import { ChevronLeft, MessageSquare } from 'lucide-react';
+import { parseMarkdown } from './parseMarkdown';
 
 interface ChatMessage {
   timestamp: string;
@@ -107,7 +108,16 @@ const ChatDetail = ({ sessionId, onBack }: ChatDetailProps) => {
                     ? 'bg-red-10 text-white' 
                     : 'bg-black/3 text-black'
                 }`}>
-                  <p className="text-sm">{message.message}</p>
+                  <p className="text-sm">
+                    {message.isUser ? (
+                      message.message
+                    ) : (
+                      <span
+                        dangerouslySetInnerHTML={{ __html: parseMarkdown(message.message) }}
+                        className="bot-message-html"
+                      />
+                    )}
+                  </p>
                   <p className={`text-xs mt-2 ${message.isUser ? 'text-white/80' : 'text-neutral-500'}`}>
                     {mounted ? new Date(message.timestamp).toLocaleString('nl-BE') : ''}
                   </p>
@@ -117,6 +127,16 @@ const ChatDetail = ({ sessionId, onBack }: ChatDetailProps) => {
           </div>
         )}
       </div>
+      <style jsx global>{`
+        .bot-message-link {
+          color: #2563eb;
+          text-decoration: underline;
+          transition: color 0.2s;
+        }
+        .bot-message-link:hover {
+          color: #1d4ed8;
+        }
+      `}</style>
     </div>
   );
 };
