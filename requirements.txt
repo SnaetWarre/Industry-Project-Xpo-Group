@@ -4,4 +4,4 @@ lxml>=4.9.3
 python-dateutil>=2.8.2
 pytz>=2024.1
 orjson
-python-json5
+json5

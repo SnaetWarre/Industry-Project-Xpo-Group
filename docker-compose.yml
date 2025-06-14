@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./src/dotnet/VectorEmbeddingService
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "5001:5001"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    
+    volumes:
+      - ./src/dotnet/VectorEmbeddingService:/app
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: production/dockerfile
+    container_name: pipeline
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      API_URL: https://backend:5001
+    entrypoint: ["sleep", "infinity"]
+    
+    volumes:
+      - ./src:/app/src
+      - ./production:/app/production
+      - ./data:/app/data 
