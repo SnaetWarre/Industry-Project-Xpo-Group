@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     messages.innerHTML = `
       <div class="bot-message-container">
-        <img src="images/robot.svg" alt="Bot">
+        <img src="../images/robot.svg" alt="Bot">
         <div class="message-wrapper">
           <div class="bot-name">${config.botName}</div>
           <div class="chatbot-bubble">
@@ -125,9 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="timestamp">${timeString}</div>
         </div>
-      </div>
-      <div class="privacy-link-container" style="text-align:right;margin-top:8px;">
-        <a href="gdpr.pdf" target="_blank" class="privacy-link" style="font-size:12px;opacity:0.7;">Privacyverklaring</a>
       </div>
     `;
     form.style.display = '';
@@ -141,6 +138,20 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
+    // Verberg privacyverklaring na eerste bericht
+    const privacyDisclaimer = document.getElementById('privacyDisclaimer');
+    if (privacyDisclaimer) {
+      privacyDisclaimer.innerHTML =
+        '<a href="gdpr.pdf" target="_blank" class="privacy-link" style="display:block;text-align:right;font-size:12px;opacity:0.7;margin:0 8px 0 0;">Privacyverklaring</a>';
+      privacyDisclaimer.style.background = 'transparent';
+      privacyDisclaimer.style.padding = '0';
+      privacyDisclaimer.style.margin = '0';
+      privacyDisclaimer.style.borderRadius = '0';
+      privacyDisclaimer.style.boxShadow = 'none';
+      privacyDisclaimer.style.minHeight = 'unset';
+      privacyDisclaimer.style.background = '#f5f5f5';
+      privacyDisclaimer.style.paddingBottom = '8px';
+    }
     const sendingMsg = {
       text,
       isUser: true,
@@ -162,19 +173,26 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error('Failed to get sessionId from backend');
+        if (!response.ok)
+          throw new Error('Failed to get sessionId from backend');
         const data = await response.json();
         setSessionIdCookie(data.sessionId);
         sid = data.sessionId;
       }
       await createUserProfile(sid, text, websiteId);
       // Track chat_start event immediately after profile creation
-      await trackAnalyticsEvent('chat_start', { sessionId: sid, website: websiteId, profileInfo: text });
+      await trackAnalyticsEvent('chat_start', {
+        sessionId: sid,
+        website: websiteId,
+        profileInfo: text,
+      });
       allMessages = allMessages.filter((m) => !m.sending);
       addMessage(text, true);
       // Bot antwoordt met vervolgvraag
       setTimeout(() => {
-        addMessage('Bedankt voor jouw interesse! Waar ben je precies naar op zoek?');
+        addMessage(
+          'Bedankt voor jouw interesse! Waar ben je precies naar op zoek?'
+        );
       }, 400);
       registrationStep = false;
       input.disabled = false;
@@ -409,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.className = 'bot-message-container';
         if (isFirstOfGroup) container.classList.add('first-of-group');
         const img = document.createElement('img');
-        img.src = 'images/robot.svg';
+        img.src = '../images/robot.svg';
         img.alt = 'Bot';
         const messageWrapper = document.createElement('div');
         messageWrapper.className = 'message-wrapper';
@@ -519,7 +537,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (e) {}
     }
-    await trackAnalyticsEvent('registration', { sessionId, website: websiteId, profileInfo });
+    await trackAnalyticsEvent('registration', {
+      sessionId,
+      website: websiteId,
+      profileInfo,
+    });
     let url = '#';
     if (websiteId === 'ffd')
       url = 'https://ffd25.registration.xpogroup.com/invitation';
@@ -544,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     typingIndicator.id = 'typingIndicator';
 
     const img = document.createElement('img');
-    img.src = 'images/robot.svg';
+    img.src = '../images/robot.svg';
     img.alt = 'Bot';
 
     const bubble = document.createElement('div');
