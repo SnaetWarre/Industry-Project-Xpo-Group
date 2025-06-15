@@ -2,7 +2,22 @@
 
 All notable changes to Event Chatbot & Vector Embedding Service will be documented in this file.
 
-## [v0.1.0] - 2025-05-30
+## [v1.0.0] - 2025-06-15
+
+### Added
+- Next.js dashboard for analytics and chat history (xpodashboard)
+- Registration clicks and user profile analytics endpoints
+- Downloadable CSV export for registration clicks
+- Chat history and statistics visualization
+- Improved frontend/backend separation and documentation
+
+### Changed
+- Enhanced security and session management
+
+### Fixed
+- Various bugfixes and performance improvements
+
+## [v0.1.0] - 2025-06-7
 
 ### Added
 - Initial beta release (v0.1.0)
@@ -11,7 +26,7 @@ All notable changes to Event Chatbot & Vector Embedding Service will be document
 - Python utilities for data cleaning
 - Vanilla Javascript as frontend
 
-## [v0.2.0] - 2024-05-31
+## [v0.2.0] - 2025-05-31
 
 ### Added
 - Conversational entity tracking and follow-up query support in ChatController

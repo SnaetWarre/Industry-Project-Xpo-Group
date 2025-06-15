@@ -25,8 +25,8 @@ public class DailyAnalytics
     [JsonPropertyName("uniqueSessions")]
     public HashSet<string> UniqueSessions { get; set; } = new();
 
-    [JsonPropertyName("companyStats")]
-    public Dictionary<string, int> CompanyStats { get; set; } = new();
+    [JsonPropertyName("profileInfoStats")]
+    public Dictionary<string, bool> ProfileInfoStats { get; set; } = new();
 
     [JsonPropertyName("sessionData")]
     public Dictionary<string, SessionData> SessionData { get; set; } = new();
@@ -43,8 +43,8 @@ public class SessionData
     [JsonPropertyName("chatToRegistrationSeconds")]
     public double? ChatToRegistrationSeconds { get; set; }
 
-    [JsonPropertyName("company")]
-    public string Company { get; set; } = string.Empty;
+    [JsonPropertyName("profileInfo")]
+    public string ProfileInfo { get; set; } = string.Empty;
 }
 
 public class WeeklyAnalytics

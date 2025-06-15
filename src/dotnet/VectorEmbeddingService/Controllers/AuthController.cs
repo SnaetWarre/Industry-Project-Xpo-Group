@@ -11,6 +11,8 @@ public class User
 {
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
 }
 
 [ApiController]
@@ -34,9 +36,31 @@ public class AuthController : ControllerBase
 
         var user = _users.FirstOrDefault(u => u.Username == request.Username && u.Password == request.Password);
         if (user == null)
+        {
+            // Log failed login attempt
+            Console.WriteLine($"Failed login attempt for username: {request.Username}");
             return Unauthorized("Invalid username or password");
+        }
 
         var token = GenerateJwtToken(request.Username);
+
+        // Set JWT as HTTP-only cookie
+        var isProduction = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production";
+        Response.Cookies.Append(
+            "jwt",
+            token,
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = isProduction, // Secure=true in production (requires HTTPS)
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddHours(24)
+            }
+        );
+
+        // Log successful login
+        Console.WriteLine($"Successful login for username: {request.Username}");
+
         return Ok(new { token });
     }
 
@@ -45,7 +69,7 @@ public class AuthController : ControllerBase
         var key = _configuration["Jwt:Key"] ?? "supersecretkey1234567890";
         var issuer = _configuration["Jwt:Issuer"] ?? "VectorEmbeddingService";
         var audience = _configuration["Jwt:Audience"] ?? "DashboardUsers";
-        var expires = DateTime.UtcNow.AddHours(8);
+        var expires = DateTime.UtcNow.AddHours(24);
 
         var claims = new[]
         {
@@ -67,6 +91,18 @@ public class AuthController : ControllerBase
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    [HttpGet("me")]
+    public IActionResult Me()
+    {
+        var username = User.Identity?.Name;
+        if (string.IsNullOrEmpty(username))
+            return Unauthorized();
+        var user = _users.FirstOrDefault(u => u.Username == username);
+        if (user == null)
+            return NotFound();
+        return Ok(new { user.Name, user.Role, user.Username });
     }
 }
 

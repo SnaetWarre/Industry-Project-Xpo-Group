@@ -2,6 +2,7 @@ using Microsoft.Azure.Cosmos;
 using VectorEmbeddingService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.Annotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,8 @@ builder.Services.AddSwaggerGen(options =>
         }
     };
     options.AddSecurityRequirement(securityRequirement);
+
+    options.EnableAnnotations();
 });
 
 // Add CORS
@@ -52,7 +55,10 @@ builder.Services.AddCors(options =>
             "https://www.artisan-xpo.be",
             "https://www.flandersflooringdays.com",
             "http://localhost:5500",
-            "http://127.0.0.1:5500"
+            "http://127.0.0.1:5500",
+            "https://localhost:5500",
+            "https://127.0.0.1:5500",
+            "http://localhost:3000"
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
