@@ -67,3 +67,4 @@ nupkg/
 
 # .NET Core appsettings
 src/dotnet/VectorEmbeddingService/appsettings.json
+src/dotnet/VectorEmbeddingService/aspnet-dev.pfx
