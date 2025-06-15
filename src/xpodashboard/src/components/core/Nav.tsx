@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Search, LayoutDashboard, MessageSquare } from 'lucide-react';
+import { Bell, Search, LayoutDashboard, MessageSquare, LogOut } from 'lucide-react';
 import AuthService from '@/lib/services/auth/authService';
 import { useSiteFilter } from '@/context/SiteFilterContext';
 import CustomDropdown from './CustomDropdown';
@@ -113,6 +113,13 @@ const Nav = ({ children }: NavProps) => {
                 </>
               )}
             </div>
+            <button
+              onClick={() => AuthService.logout()}
+              className="ml-4 p-2 rounded-lg hover:bg-red-10/10 text-gray-600 hover:text-red-10 transition-colors duration-300 cursor-pointer"
+              title="Uitloggen"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
           </div>
         </div>
 

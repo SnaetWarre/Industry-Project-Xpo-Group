@@ -64,6 +64,11 @@ class AuthService {
     localStorage.removeItem('jwt');
   }
 
+  static async logout() {
+    this.clearToken();
+    window.location.href = '/auth/sign-in';
+  }
+
   static async getCurrentUser() {
     const headers = await this.getHeaders();
     const response = await axios.get(`${API_CONFIG.baseUrl}/api/auth/me`, {
