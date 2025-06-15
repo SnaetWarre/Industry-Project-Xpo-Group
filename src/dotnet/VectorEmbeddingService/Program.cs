@@ -4,6 +4,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Annotations;
 
+// Check for password hash generation command
+if (args.Length > 0 && args[0] == "--generate-hashes")
+{
+    VectorEmbeddingService.PasswordHasher.GenerateHashesForConfig();
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

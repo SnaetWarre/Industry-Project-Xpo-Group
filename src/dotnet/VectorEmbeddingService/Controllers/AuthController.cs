@@ -34,8 +34,8 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest("Username and password are required");
 
-        var user = _users.FirstOrDefault(u => u.Username == request.Username && u.Password == request.Password);
-        if (user == null)
+        var user = _users.FirstOrDefault(u => u.Username == request.Username);
+        if (user == null || !PasswordHasher.VerifyPassword(request.Password, user.Password))
         {
             // Log failed login attempt
             Console.WriteLine($"Failed login attempt for username: {request.Username}");
