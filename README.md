@@ -1,10 +1,11 @@
-[![Version](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](CHANGELOG.md)
 
 # Event Chatbot & Vector Embedding Service
 
 This project provides a full-stack solution for event Q&A using Retrieval-Augmented Generation (RAG):
 - **.NET-based vector embedding service** (Azure OpenAI + CosmosDB) for semantic search and storage
 - **Scrapy-based web scraper** for ingesting event data
+- **Next.js dashboard** for analytics and chat history
 
 ---
 
@@ -12,75 +13,125 @@ This project provides a full-stack solution for event Q&A using Retrieval-Augmen
 
 ```
 .
+├── CHANGELOG.md
 ├── data
-│   └── processed
-│       ├── abiss_site_data_cleaned.json
-│       ├── abiss_site_data.json
-│       ├── artisan_site_data_cleaned.json
-│       ├── artisan_site_data.json
-│       ├── ffd_site_data_cleaned.json
-│       └── ffd_site_data.json
-├── docs
-│   └── overview.html
+│   └── processed
+│       ├── abiss_site_data_cleaned_cleaned.json
+│       ├── abiss_site_data_cleaned.json
+│       ├── abiss_site_data.json
+│       ├── artisan_site_data_cleaned_cleaned.json
+│       ├── artisan_site_data_cleaned.json
+│       ├── artisan_site_data.json
+│       ├── ffd_site_data_cleaned_cleaned.json
+│       ├── ffd_site_data_cleaned.json
+│       └── ffd_site_data.json
+├── docker-compose.yml
+├── .example.env
 ├── .gitignore
 ├── Industry-Project-Xpo-Group.sln
-├── plan.md
+├── production
+│   ├── dockerfile
+│   ├── .env
+│   ├── .example.env
+│   ├── requirements.txt
+│   ├── run_pipeline.sh
+│   └── todo.txt
 ├── README.md
 ├── requirements.txt
 ├── scrapy.cfg
-└── src
-    ├── dotnet
-    │   └── VectorEmbeddingService
-    │       ├── appsettings.example.json
-    │       ├── appsettings.json
-    │       ├── bin
-    │       ├── Controllers
-    │       │   ├── AbissController.cs
-    │       │   ├── AnalyticsController.cs
-    │       │   ├── AnalyticsDashboardController.cs
-    │       │   ├── ArtisanController.cs
-    │       │   ├── AuthController.cs
-    │       │   ├── ChatController.cs
-    │       │   ├── FfdController.cs
-    │       ├── Models
-    │       │   ├── AnalyticsEvent.cs
-    │       │   ├── ChatRequest.cs
-    │       │   ├── EventDocument.cs
-    │       │   ├── SearchRequest.cs
-    │       │   └── UserProfile.cs
-    │       ├── obj
-    │       ├── Program.cs
-    │       ├── Services
-    │       │   ├── AzureOpenAIEmbeddingService.cs
-    │       │   ├── CosmosDbService.cs
-    │       │   ├── ICosmosDbService.cs
-    │       │   └── IEmbeddingService.cs
-    │       ├── upload_to_vector_db.py
-    │       ├── vector_api_client.py
-    │       └── VectorEmbeddingService.csproj
-    ├── python
-    │   ├── scraper
-    │   │   ├── items.py
-    │   │   ├── middlewares.py
-    │   │   ├── settings.py
-    │   │   └── spiders
-    │   │       ├── event_site_spider.py
-    │   │       └── event_site_spider_clean.py
-    │   └── utils
-    │       └── clean_json.py
-    └── web
-        ├── css
-        │   └── chatbot.css
-        ├── images
-        │   └── robot.svg
-        ├── importready
-        │   ├── abiss-bot.js
-        │   ├── artisan-bot.js
-        │   ├── ffd-bot.js
-        │   └── importtest.html
-        ├── index.html
-        └── js
-            └── chatbot.js
+├── src
+│   ├── dotnet
+│   │   └── VectorEmbeddingService
+│   │       ├── appsettings.example.json
+│   │       ├── Controllers
+│   │       │   ├── AbissController.cs
+│   │       │   ├── AnalyticsController.cs
+│   │       │   ├── AnalyticsDashboardController.cs
+│   │       │   ├── ArtisanController.cs
+│   │       │   ├── AuthController.cs
+│   │       │   ├── ChatController.cs
+│   │       │   └── FfdController.cs
+│   │       ├── Dockerfile
+│   │       ├── Models
+│   │       │   ├── AnalyticsEvent.cs
+│   │       │   ├── ChatRequest.cs
+│   │       │   ├── EventDocument.cs
+│   │       │   ├── SearchRequest.cs
+│   │       │   └── UserProfile.cs
+│   │       ├── Program.cs
+│   │       ├── Properties
+│   │       │   └── launchSettings.json
+│   │       ├── Services
+│   │       │   ├── AzureOpenAIEmbeddingService.cs
+│   │       │   ├── CosmosDbService.cs
+│   │       │   ├── ICosmosDbService.cs
+│   │       │   └── IEmbeddingService.cs
+│   │       ├── upload_to_vector_db.py
+│   │       ├── vector_api_client.py
+│   │       └── VectorEmbeddingService.csproj
+│   ├── python
+│   │   ├── scraper
+│   │   │   ├── items.py
+│   │   │   ├── middlewares.py
+│   │   │   ├── settings.py
+│   │   │   └── spiders
+│   │   │       ├── event_site_spider_clean.py
+│   │   │       └── event_site_spider.py
+│   │   └── utils
+│   │       └── clean_json.py
+│   ├── web
+│   │   ├── css
+│   │   │   └── chatbot.css
+│   │   ├── gdpr.pdf
+│   │   ├── images
+│   │   │   └── robot.svg
+│   │   ├── importready
+│   │   │   ├── abiss-bot.js
+│   │   │   ├── artisan-bot.js
+│   │   │   ├── ffd-bot.js
+│   │   │   └── importtest.html
+│   │   ├── index.html
+│   │   └── js
+│   │       └── chatbot.js
+│   └── xpodashboard
+│       ├── eslint.config.mjs
+│       ├── .gitignore
+│       ├── next.config.ts
+│       ├── next-env.d.ts
+│       ├── package.json
+│       ├── package-lock.json
+│       ├── postcss.config.mjs
+│       ├── public
+│       │   └── images
+│       │       ├── kortrijk-xpo-logo.svg
+│       │       └── kortrijk-xpo-logo-white.svg
+│       ├── README.md
+│       ├── src
+│       │   ├── app
+│       │   │   ├── auth
+│       │   │   ├── chatgeschiedenis
+│       │   │   ├── favicon.ico
+│       │   │   ├── globals.css
+│       │   │   ├── layout.tsx
+│       │   │   ├── page.tsx
+│       │   │   └── (routes)
+│       │   ├── components
+│       │   │   ├── auth
+│       │   │   ├── chatgeschiedenis
+│       │   │   ├── core
+│       │   │   └── dashboard
+│       │   ├── context
+│       │   │   └── SiteFilterContext.tsx
+│       │   ├── lib
+│       │   │   ├── config.ts
+│       │   │   ├── providers
+│       │   │   ├── services
+│       │   │   └── types
+│       │   └── services
+│       │       └── api.ts
+│       └── tsconfig.json
+└── .vscode
+    ├── settings.example.json
 ```
 
 ---
@@ -122,12 +173,23 @@ python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/f
 ```
 - Use for each event dataset you want to index
 
+### 4. Next.js Dashboard (Frontend)
+
+```bash
+cd src/xpodashboard
+npm install
+npm run dev
+```
+- Dashboard runs on `http://localhost:3000` by default
+- Provides analytics, chat history, and registration stats
+
 ---
 
 ## Main Components
 - **src/python/chatbot/**: LangChain-based chatbot, connects to vector API
 - **src/python/scraper/**: Scrapy spiders for event data
 - **src/dotnet/VectorEmbeddingService/**: .NET WebAPI for embedding, search, and DB
+- **src/xpodashboard/**: Next.js dashboard for analytics and chat history
 - **data/processed/**: Cleaned event data JSONs
 
 ---
@@ -136,19 +198,21 @@ python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/f
 1. **Scraper** collects event data → outputs JSON
 2. **Upload script** sends data to .NET API, which embeds and stores in CosmosDB
 3. **Chatbot** queries .NET API for relevant events, then uses LLM to answer user
+4. **Dashboard** visualizes analytics and chat history
 
 ---
 
 ## Configuration
 - **appsettings.json** in `src/dotnet/VectorEmbeddingService/` for Azure/Cosmos/OpenAI keys
 - **requirements.txt** for Python dependencies
+- **.env** for environment variables
 
 ---
 
-## Notes
-- Adjust embedding chunk size in `AzureOpenAIEmbeddingService.cs` if your model supports more tokens per request.
-- For large events, consider chunking text before upload for best retrieval.
-- All REST endpoints are under `/api/events/` (see `EventsController.cs`). 
+## Release Notes
+See [CHANGELOG.md](CHANGELOG.md) for details on new features, fixes, and improvements.
+
+---
 
 ## Local Development: HTTPS Setup Guide
 
