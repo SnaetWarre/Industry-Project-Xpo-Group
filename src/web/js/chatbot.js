@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     messages.innerHTML = `
       <div class="bot-message-container">
-        <img src="../images/robot.svg" alt="Bot">
+        <img src="images/robot.svg" alt="Bot">
         <div class="message-wrapper">
           <div class="bot-name">${config.botName}</div>
           <div class="chatbot-bubble">
@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.className = 'bot-message-container';
         if (isFirstOfGroup) container.classList.add('first-of-group');
         const img = document.createElement('img');
-        img.src = '../images/robot.svg';
+        img.src = 'images/robot.svg';
         img.alt = 'Bot';
         const messageWrapper = document.createElement('div');
         messageWrapper.className = 'message-wrapper';
@@ -566,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     typingIndicator.id = 'typingIndicator';
 
     const img = document.createElement('img');
-    img.src = '../images/robot.svg';
+    img.src = 'images/robot.svg';
     img.alt = 'Bot';
 
     const bubble = document.createElement('div');
