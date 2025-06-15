@@ -6,6 +6,8 @@ This project provides a full-stack solution for event Q&A using Retrieval-Augmen
 - **.NET-based vector embedding service** (Azure OpenAI + CosmosDB) for semantic search and storage
 - **Scrapy-based web scraper** for ingesting event data
 - **Next.js dashboard** for analytics and chat history
+- **Javascript chatbot** for easy use of the chat api
+
 
 ---
 
