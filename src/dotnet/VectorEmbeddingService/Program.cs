@@ -150,3 +150,9 @@ Console.WriteLine("export ASPNETCORE_ENVIRONMENT=Development");
 Console.WriteLine("voer bovenstaande commmando uit in je terminal voor swagger te kunnen gebruiken");
 
 app.Run();
+
+// For integration testing with WebApplicationFactory
+namespace VectorEmbeddingService
+{
+    public partial class Program { }
+}

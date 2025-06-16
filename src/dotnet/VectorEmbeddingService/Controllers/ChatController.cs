@@ -22,9 +22,11 @@ public class ChatController : ControllerBase
     private readonly ILogger<ChatController> _logger;
     private readonly OpenAIClient _openAIClient;
     private readonly string _deploymentName;
-    private readonly ConcurrentDictionary<string, List<DateTime>> _rateLimiter = new();
-    private const int MaxRequests = 60;
-    private const int TimeWindowSeconds = 60;
+    private static readonly ConcurrentDictionary<string, List<DateTime>> _rateLimiter = new();
+    private static readonly int MaxRequests = int.TryParse(Environment.GetEnvironmentVariable("RATE_LIMIT_MAX_REQUESTS"), out var mr) ? mr : 1;
+    private static readonly int TimeWindowSeconds = int.TryParse(Environment.GetEnvironmentVariable("RATE_LIMIT_WINDOW_SECONDS"), out var tw) ? tw : 3;
+    private const string SessionCookieName = "chatbotSessionId";
+    private static readonly Random _random = new();
     private readonly HashSet<string> _stopWords = new()
     {
         "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours",
@@ -147,8 +149,8 @@ public class ChatController : ControllerBase
 
     private static readonly ConcurrentDictionary<string, (int Count, DateTime Date)> _userDailyCounts = new();
     private static (int Count, DateTime Date) _globalDailyCount = (0, DateTime.UtcNow.Date);
-    private const int MaxUserRequestsPerDay = 20;
-    private const int MaxGlobalRequestsPerDay = 2000;
+    private static readonly int MaxUserRequestsPerDay = int.TryParse(Environment.GetEnvironmentVariable("RATE_LIMIT_MAX_USER_PER_DAY"), out var mud) ? mud : 20;
+    private static readonly int MaxGlobalRequestsPerDay = int.TryParse(Environment.GetEnvironmentVariable("RATE_LIMIT_MAX_GLOBAL_PER_DAY"), out var mgd) ? mgd : 2000;
 
     public ChatController(
         CosmosClient cosmosClient,
@@ -167,6 +169,8 @@ public class ChatController : ControllerBase
         var chatApiKey = configuration["AzureOpenAIChat:ApiKey"] ?? throw new ArgumentNullException("AzureOpenAIChat:ApiKey");
         _deploymentName = configuration["AzureOpenAIChat:ChatDeploymentName"] ?? throw new ArgumentNullException("AzureOpenAIChat:ChatDeploymentName");
         _openAIClient = new OpenAIClient(new Uri(chatEndpoint), new AzureKeyCredential(chatApiKey));
+
+        _logger.LogInformation($"[RateLimit] MaxUserRequestsPerDay: {MaxUserRequestsPerDay}");
     }
 
     private bool IsUserRateLimitExceeded(string sessionId)
@@ -175,15 +179,18 @@ public class ChatController : ControllerBase
         var entry = _userDailyCounts.GetOrAdd(sessionId, (0, today));
         if (entry.Date != today)
         {
+            _logger.LogInformation($"[RateLimit] Resetting daily count for session {sessionId} (new day). Setting count to 1.");
             _userDailyCounts[sessionId] = (1, today);
             return false;
         }
+        _logger.LogInformation($"[RateLimit] Session: {sessionId}, CurrentCount: {entry.Count}, MaxUserRequestsPerDay: {MaxUserRequestsPerDay}");
         if (entry.Count >= MaxUserRequestsPerDay)
         {
-            _logger.LogWarning($"User rate limit exceeded for session {sessionId}");
+            _logger.LogWarning($"[RateLimit] User rate limit exceeded for session {sessionId} (count: {entry.Count}, max: {MaxUserRequestsPerDay})");
             return true;
         }
         _userDailyCounts[sessionId] = (entry.Count + 1, today);
+        _logger.LogInformation($"[RateLimit] Incremented count for session {sessionId} to {entry.Count + 1}");
         return false;
     }
 
@@ -207,11 +214,31 @@ public class ChatController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> Chat([FromBody] ChatRequest request)
     {
-        var sessionId = request.SessionId ?? HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        
+        string sessionId = null;
+        if (Request.Cookies.ContainsKey(SessionCookieName))
+        {
+            sessionId = Request.Cookies[SessionCookieName];
+        }
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            sessionId = Guid.NewGuid().ToString("N") + _random.Next(1000, 9999);
+            Response.Cookies.Append(SessionCookieName, sessionId, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+        }
+        
+
         if (IsUserRateLimitExceeded(sessionId))
             return StatusCode(429, "User daily chat limit reached");
         if (IsGlobalRateLimitExceeded())
             return StatusCode(429, "Global daily chat limit reached");
+        if (!IsSessionRateLimitAllowed(sessionId))
+            return StatusCode(429, "Too many requests. Please try again later.");
         _logger.LogInformation("Chat endpoint hit");
         try
         {
@@ -224,11 +251,7 @@ public class ChatController : ControllerBase
             var databaseName = "XpoData";
             var cosmosLogger = _loggerFactory.CreateLogger<CosmosDbService>();
             var cosmosService = new CosmosDbService(_cosmosClient, _embeddingService, databaseName, website, cosmosLogger);
-
-            // Get client IP for rate limiting
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            if (!IsRateLimitAllowed(ipAddress))
-                return StatusCode(429, "Too many requests. Please try again later.");
+       
 
             // Sanitize input
             var sanitizedInput = SanitizeInput(request.Query);
@@ -418,23 +441,19 @@ public class ChatController : ControllerBase
         }
     }
 
-    private bool IsRateLimitAllowed(string ipAddress)
+    private bool IsSessionRateLimitAllowed(string sessionId)
     {
         var now = DateTime.UtcNow;
         var windowStart = now.AddSeconds(-TimeWindowSeconds);
-
-        if (!_rateLimiter.TryGetValue(ipAddress, out var requests))
+        if (!_rateLimiter.TryGetValue(sessionId, out var requests))
         {
             requests = new List<DateTime>();
-            _rateLimiter[ipAddress] = requests;
+            _rateLimiter[sessionId] = requests;
         }
-
-        // Remove old requests
         requests.RemoveAll(r => r < windowStart);
-
+        _logger.LogInformation($"[RateLimit] Session: {sessionId}, Requests in window: {requests.Count}, Now: {now:O}, WindowStart: {windowStart:O}, Timestamps: [{string.Join(", ", requests.Select(r => r.ToString("O")))}]");
         if (requests.Count >= MaxRequests)
             return false;
-
         requests.Add(now);
         return true;
     }
@@ -690,5 +709,59 @@ public class ChatController : ControllerBase
         if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value))
             return match.Groups[1].Value.Trim();
         return string.Empty;
+    }
+
+    [HttpGet("demo-ratelimit")]
+    public ActionResult<object> DemoRateLimit()
+    {
+        // --- Session ID via Cookie ---
+        string sessionId = null;
+        if (Request.Cookies.ContainsKey(SessionCookieName))
+        {
+            sessionId = Request.Cookies[SessionCookieName];
+        }
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            sessionId = Guid.NewGuid().ToString("N") + _random.Next(1000, 9999);
+            Response.Cookies.Append(SessionCookieName, sessionId, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+        }
+        // --- End Session ID via Cookie ---
+
+        _logger.LogInformation($"[DemoRateLimit] Session: {sessionId}, Cookies: {string.Join(", ", Request.Cookies.Select(kvp => kvp.Key + "=" + kvp.Value))}");
+
+        if (IsUserRateLimitExceeded(sessionId))
+            return StatusCode(429, new { error = "User daily chat limit reached" });
+        if (IsGlobalRateLimitExceeded())
+            return StatusCode(429, new { error = "Global daily chat limit reached" });
+        if (!IsSessionRateLimitAllowed(sessionId))
+            return StatusCode(429, new { error = "Too many requests. Please try again later." });
+
+        // Count requests in the current minute window
+        var now = DateTime.UtcNow;
+        var windowStart = now.AddSeconds(-TimeWindowSeconds);
+        if (!_rateLimiter.TryGetValue(sessionId, out var requests))
+        {
+            requests = new List<DateTime>();
+            _rateLimiter[sessionId] = requests;
+        }
+        requests.RemoveAll(r => r < windowStart);
+        int requestsThisMinute = requests.Count;
+
+        _logger.LogInformation($"[DemoRateLimit] Session: {sessionId}, RequestsThisWindow: {requestsThisMinute}, Now: {now:O}, WindowStart: {windowStart:O}, Timestamps: [{string.Join(", ", requests.Select(r => r.ToString("O")))}]");
+
+        return Ok(new
+        {
+            message = "Demo rate limit endpoint: request accepted.",
+            requestsThisWindow = requestsThisMinute,
+            perWindowLimit = MaxRequests,
+            windowSeconds = TimeWindowSeconds,
+            perDayLimit = MaxUserRequestsPerDay
+        });
     }
 } 
