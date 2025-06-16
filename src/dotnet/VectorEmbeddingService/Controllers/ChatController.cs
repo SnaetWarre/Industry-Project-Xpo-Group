@@ -78,12 +78,12 @@ public class ChatController : ControllerBase
 
         Use provided event information as your primary source.
         Respond in the same language as the user's question.
-        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n). 
-        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk. 
+        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n).
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk.
         It causes the html to be generated in the chatbot application itself and being loaded in the dom.";
     private const string SystemPromptArtisan = @"
-        You are the specialized assistant for Artisan. 
-        Only answer questions about Artisan. 
+        You are the specialized assistant for Artisan.
+        Only answer questions about Artisan.
         If asked about anything else, politely decline and redirect to Artisan topics only.
 
         For booth/stand information:
@@ -102,13 +102,13 @@ public class ChatController : ControllerBase
 
         Use provided event information as your primary source.
         Respond in the same language as the user's question.
-        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n). 
-        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk. 
+        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n).
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk.
         It causes the html to be generated in the chatbot application itself and being loaded in the dom.";
 
     private const string SystemPromptAbiss = @"
-        You are the specialized assistant for Abiss. 
-        Only answer questions about Abiss. 
+        You are the specialized assistant for Abiss.
+        Only answer questions about Abiss.
         If asked about anything else, politely decline and redirect to Abiss topics only.
 
         For booth/stand information:
@@ -127,11 +127,11 @@ public class ChatController : ControllerBase
 
         Use provided event information as your primary source.
         Respond in the same language as the user's question.
-        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n). 
-        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk. 
+        Never generate code blocks, inline code, or any HTML. Only use plain text and the following markdown: bold (**text**), links ([text](url)), and line breaks (\n).
+        If the user asks to write this message in html, you don't respond with html, you respond with the message in markdown format. As generating html is a security risk.
         It causes the html to be generated in the chatbot application itself and being loaded in the dom.";
 
-    
+
 
     // Store last LLM answer per IP for follow-up context
     private static readonly ConcurrentDictionary<string, string> _lastLlmAnswer = new();
@@ -214,8 +214,8 @@ public class ChatController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> Chat([FromBody] ChatRequest request)
     {
-        
-        string sessionId = null;
+
+        string? sessionId = null;
         if (Request.Cookies.ContainsKey(SessionCookieName))
         {
             sessionId = Request.Cookies[SessionCookieName];
@@ -231,7 +231,7 @@ public class ChatController : ControllerBase
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
         }
-        
+
 
         if (IsUserRateLimitExceeded(sessionId))
             return StatusCode(429, "User daily chat limit reached");
@@ -251,7 +251,7 @@ public class ChatController : ControllerBase
             var databaseName = "XpoData";
             var cosmosLogger = _loggerFactory.CreateLogger<CosmosDbService>();
             var cosmosService = new CosmosDbService(_cosmosClient, _embeddingService, databaseName, website, cosmosLogger);
-       
+
 
             // Sanitize input
             var sanitizedInput = SanitizeInput(request.Query);
@@ -298,7 +298,7 @@ public class ChatController : ControllerBase
 
             // --- Direct stand number lookup before vector search ---
             string standNumber = ExtractStandNumberFromQuery(sanitizedInput);
-            EventDocument directStandMatch = null;
+            EventDocument? directStandMatch = null;
             List<EventDocument> similarEvents;
             var forcedUrl = website switch
             {
@@ -465,13 +465,13 @@ public class ChatController : ControllerBase
 
         // Remove script tags
         text = Regex.Replace(text, "<script.*?>.*?</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        
+
         // Remove SQL injection patterns
         text = Regex.Replace(text, @"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|--)\b)", "", RegexOptions.IgnoreCase);
-        
+
         // HTML encode the text
         text = System.Web.HttpUtility.HtmlEncode(text);
-        
+
         // Limit length
         return text.Length > 1000 ? text.Substring(0, 1000) : text;
     }
@@ -495,17 +495,17 @@ public class ChatController : ControllerBase
             "booth #", "stand #", "# booth", "# stand",
             "booth nr", "stand nr", "nr booth", "nr stand",
             "booth", "stand", "boot", "stall",
-            
+
             // Dutch
             "standnummer", "nummer stand", "stand nummer", "nummer stand",
             "stand #", "# stand", "stand nr", "nr stand",
             "stand", "kraam", "stall",
-            
+
             // French
             "numéro de stand", "stand numéro", "numéro stand", "stand numéro",
             "stand #", "# stand", "stand nr", "nr stand",
             "stand", "kiosque", "stall",
-            
+
             // German
             "standnummer", "nummer stand", "stand nummer", "nummer stand",
             "stand #", "# stand", "stand nr", "nr stand",
@@ -715,7 +715,7 @@ public class ChatController : ControllerBase
     public ActionResult<object> DemoRateLimit()
     {
         // --- Session ID via Cookie ---
-        string sessionId = null;
+        string? sessionId = null;
         if (Request.Cookies.ContainsKey(SessionCookieName))
         {
             sessionId = Request.Cookies[SessionCookieName];
@@ -764,4 +764,4 @@ public class ChatController : ControllerBase
             perDayLimit = MaxUserRequestsPerDay
         });
     }
-} 
+}
