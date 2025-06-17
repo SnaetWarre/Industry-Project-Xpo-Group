@@ -1,7 +1,6 @@
 import axios from "axios";
 
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/analytics-dashboard/users`;
-const WEBSITES = ["ffd", "abiss", "artisan"];
 
 export interface UserProfile {
   profileInfo: string;

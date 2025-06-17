@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AbissBot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Ropa+Sans&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/chatbot.css" />
+  </head>
+
+  <body>
+    <!-- Bot selector for testing multiple chat endpoints -->
+    <div class="chatbot-selector">
+      <label for="chatSelector">Choose Bot:</label>
+      <select id="chatSelector">
+        <option value="ffd">FFDBot</option>
+        <option value="artisan">ArtisanBot</option>
+        <option value="abiss">AbissBot</option>
+      </select>
+    </div>
+    <div class="chatbot-container" data-website="ffd">
+      <div class="chatbot-launcher-wrapper">
+        <div class="chatbot-launcher-label" id="chatbotLauncherLabel">
+          Vraag iets aan de AI
+        </div>
+        <div class="chatbot-launcher" id="chatbotLauncher" title="Open chatbot">
+          <span>
+            <img src="images/robot.svg" alt="Bot" />
+          </span>
+        </div>
+      </div>
+
+      <div class="chatbot-window" id="chatbotWindow" style="display: none">
+        <div class="chatbot-header">
+          <img src="images/robot.svg" alt="Bot" class="chatbot-header-icon" />
+          <span class="chatbot-header-title">AbissBot</span>
+          <button class="chatbot-close" id="chatbotClose" title="Sluiten">
+            ×
+          </button>
+        </div>
+        <div class="chatbot-messages" id="chatbotMessages">
+          <!-- Welcome message will be set dynamically -->
+        </div>
+        <div class="privacy-disclaimer" id="privacyDisclaimer">
+          <small>
+            Door een chat te starten met de AI,
+            <span class="disclaimer-bold">ga je akkoord</span> met onze
+            <a href="gdpr.pdf" target="_blank" class="privacy-link"
+              >Privacyverklaring</a
+            >.
+          </small>
+        </div>
+        <form class="chatbot-input-area" id="chatbotForm" autocomplete="off">
+          <input
+            class="chatbot-input"
+            id="chatbotInput"
+            type="text"
+            placeholder="Schrijf een bericht"
+            required
+          />
+          <button class="chatbot-send" type="submit" title="Versturen">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 20L21 12L3 4V10L17 12L3 14V20Z" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script src="js/chatbot.js"></script>
+  </body>
+</html>
