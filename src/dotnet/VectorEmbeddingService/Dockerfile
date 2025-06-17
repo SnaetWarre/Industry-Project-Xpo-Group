@@ -12,4 +12,4 @@ COPY --from=build /app/out .
 # COPY appsettings.json ./appsettings.json
 EXPOSE 5000
 ENV ASPNETCORE_URLS=http://+:5000
-ENTRYPOINT ["dotnet", "bin/Debug/net8.0/VectorEmbeddingService.dll"] 
+ENTRYPOINT ["dotnet", "VectorEmbeddingService.dll"] 
