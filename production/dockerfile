@@ -7,8 +7,15 @@ COPY requirements.txt .
 COPY scrapy.cfg .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your code
-COPY src/ ./src/
+# Create necessary directories
+RUN mkdir -p data/processed src/python src/dotnet/VectorEmbeddingService
+
+# Copy only the Python scraper code and utilities
+COPY src/python/ ./src/python/
+COPY src/dotnet/VectorEmbeddingService/upload_to_vector_db.py ./src/dotnet/VectorEmbeddingService/
+COPY src/dotnet/VectorEmbeddingService/vector_api_client.py ./src/dotnet/VectorEmbeddingService/
+
+# Copy the pipeline script
 COPY production/run_pipeline.sh ./run_pipeline.sh
 
 RUN chmod +x ./run_pipeline.sh

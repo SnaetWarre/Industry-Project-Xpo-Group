@@ -68,3 +68,7 @@ nupkg/
 # .NET Core appsettings
 src/dotnet/VectorEmbeddingService/appsettings.json
 src/dotnet/VectorEmbeddingService/aspnet-dev.pfx
+
+# Production environment files
+production/.env.production
+production/azure/.env.azure.local
