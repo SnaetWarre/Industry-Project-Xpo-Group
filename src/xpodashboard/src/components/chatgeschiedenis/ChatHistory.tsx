@@ -81,6 +81,10 @@ const Skeleton = ({ className = '' }) => (
 const ChatHistory = () => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const [profiles, setProfiles] = useState<(UserProfile & { id: string; beurs: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -159,13 +163,11 @@ const ChatHistory = () => {
     state: {
       sorting,
       columnFilters,
-      pagination: {
-        pageSize: 10,
-        pageIndex: 0,
-      },
+      pagination,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: setPagination,
     sortDescFirst: true,
   });
 
@@ -340,7 +342,7 @@ const ChatHistory = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-black">
-              {table.getRowModel().rows.map(row => (
+              {table.getRowModel().rows.slice(0, pagination.pageSize).map(row => (
                 <tr 
                   key={row.id} 
                   className="border-b border-neutral-150 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -361,20 +363,24 @@ const ChatHistory = () => {
         </div>
         
         {/* Pagination */}
-        <div className="flex items-center justify-between mt-4 text-sm text-black">
-          <span>
+        <div className="flex items-center justify-between mt-4 p-4 border-t border-neutral-150">
+          <span className="text-sm text-neutral-500">
             {table.getFilteredRowModel().rows.length} resultaten
           </span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
             <button
-              className="text-black hover:text-gray-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 hover:text-red-10 disabled:opacity-50 disabled:hover:text-neutral-700 transition-colors"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
               Vorige
             </button>
+            <span className="text-sm text-neutral-500">
+              Pagina {table.getState().pagination.pageIndex + 1} van{' '}
+              {table.getPageCount()}
+            </span>
             <button
-              className="text-black hover:text-gray-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 hover:text-red-10 disabled:opacity-50 disabled:hover:text-neutral-700 transition-colors"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
