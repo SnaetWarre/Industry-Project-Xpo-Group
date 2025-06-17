@@ -141,7 +141,6 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
 app.UseAuthentication(); // Only needed for [Authorize] controllers
 app.UseAuthorization();
 app.MapControllers();

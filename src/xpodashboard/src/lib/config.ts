@@ -1,5 +1,5 @@
 export const API_CONFIG = {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'https://localhost:5001',
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
   endpoints: {
     auth: {
       login: '/api/auth/login',

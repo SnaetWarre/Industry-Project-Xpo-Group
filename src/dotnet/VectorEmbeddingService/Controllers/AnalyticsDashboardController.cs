@@ -104,9 +104,10 @@ public class AnalyticsDashboardController : ControllerBase
         // Maak een dictionary voor snelle lookup: profileInfo (lowercase, trim) -> sessionId
         var profileInfoToSessionId = userProfiles
             .Where(u => !string.IsNullOrEmpty(u.ProfileInfo) && !string.IsNullOrEmpty(u.SessionId))
+            .GroupBy(u => u.ProfileInfo.Trim().ToLower())
             .ToDictionary(
-                u => u.ProfileInfo.Trim().ToLower(),
-                u => u.SessionId
+                g => g.Key,
+                g => g.First().SessionId
             );
 
         var result = new List<object>();

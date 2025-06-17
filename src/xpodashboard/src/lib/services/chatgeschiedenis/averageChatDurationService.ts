@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://localhost:5001/api/analytics-dashboard';
+const API_URL = 'http://localhost:5000/api/analytics-dashboard';
 
 export interface AverageChatDurationResponse {
   averageDurationSeconds: number;

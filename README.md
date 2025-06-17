@@ -178,20 +178,6 @@ Edit `src/dotnet/VectorEmbeddingService/appsettings.json` with your Azure creden
 
 ```json
 {
-  "Kestrel": {
-    "Endpoints": {
-      "Https": {
-        "Url": "https://+:5001",
-        "Certificate": {
-          "Path": "aspnet-dev.pfx",
-          "Password": "yourpassword"
-        }
-      },
-      "Http": {
-        "Url": "http://+:5000"
-      }
-    }
-  },
   "Logging": {
     "LogLevel": {
       "Default": "Information",
@@ -252,7 +238,7 @@ Edit `src/dotnet/VectorEmbeddingService/appsettings.json` with your Azure creden
    ```
 
 This will start:
-- **Backend API** on `http://localhost:5001` (HTTPS) and `http://localhost:5000` (HTTP)
+- **Backend API** on `http://localhost:5000` (HTTP)
 - **Next.js Dashboard** on `http://localhost:3000`
 - **Pipeline container** for data processing (runs in background)
 
@@ -260,7 +246,7 @@ This will start:
 
 | Service | Description | Port | Status |
 |---------|-------------|------|--------|
-| `backend` | .NET Vector Embedding API | 5000/5001 | Always running |
+| `backend` | .NET Vector Embedding API | 5000/5000 | Always running |
 | `xpodashboard` | Next.js Analytics Dashboard | 3000 | Always running |
 | `pipeline` | Python scraper & data processor | N/A | Background service |
 
@@ -297,7 +283,7 @@ dotnet restore
 dotnet build
 dotnet run
 ```
-Service runs on `https://localhost:5001` and `http://localhost:5000`
+Service runs on `https://localhost:5000` and `http://localhost:5000`
 
 #### Frontend (Next.js Dashboard)
 ```bash
@@ -321,44 +307,15 @@ scrapy crawl event_spider
 python src/python/utils/clean_json.py
 ```
 
-### 4. HTTPS Setup for Local Development
-
-#### Generate SSL Certificates
-```bash
-mkdir -p ~/.localhost-ssl
-openssl req -x509 -out ~/.localhost-ssl/cert.pem -keyout ~/.localhost-ssl/key.pem \
-  -newkey rsa:2048 -nodes -sha256 \
-  -subj '/CN=localhost' -extensions EXT -config <( \
-   printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
-```
-
-#### Trust .NET Development Certificate
-```bash
-dotnet dev-certs https --trust
-```
-
-#### Configure VS Code Live Server
-Create `.vscode/settings.json` (copy from `.vscode/settings.example.json`):
-```json
-{
-  "liveServer.settings.https": {
-    "enable": true,
-    "cert": "~/.localhost-ssl/cert.pem",
-    "key": "~/.localhost-ssl/key.pem",
-    "passphrase": ""
-  }
-}
-```
-
-### 5. Data Upload & Processing
+### 4 Data Upload & Processing
 
 #### Upload Event Data to Vector Database
 ```bash
 # Using Docker (recommended)
-docker exec -it pipeline python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/ffd_site_data_cleaned.json --api-url http://backend:5001
+docker exec -it pipeline python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/ffd_site_data_cleaned.json --api-url http://backend:5000
 
 # Using local Python environment
-python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/ffd_site_data_cleaned.json --api-url http://localhost:5001
+python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/ffd_site_data_cleaned.json --api-url http://localhost:5000
 ```
 
 #### Available Datasets
@@ -371,9 +328,9 @@ python src/dotnet/VectorEmbeddingService/upload_to_vector_db.py data/processed/f
 ## Usage
 
 ### Service URLs (Docker)
-- **Backend API**: `http://localhost:5001` (HTTPS), `http://localhost:5000` (HTTP)
+- **Backend API**: `http://localhost:5000` (HTTP)
 - **Dashboard**: `http://localhost:3000`
-- **Chatbot Frontend**: `https://localhost:5500` (using VS Code Live Server)
+- **Chatbot Frontend**: `http://localhost:5500` (using VS Code Live Server)
 
 ### Web Interface (Chatbot)
 
@@ -384,7 +341,7 @@ The main chatbot interface (`src/web/index.html`) provides a complete chat exper
    - Install the "Live Server" extension in VS Code
    - Right-click on `src/web/index.html`
    - Select "Open with Live Server"
-   - Access at `https://localhost:5500` (with HTTPS setup) or `http://localhost:5500`
+   - Access at `http://localhost:5500`
 
 2. **Features:**
    - **Bot Selection**: Choose between FFDBot, ArtisanBot, and AbissBot using the dropdown
@@ -471,19 +428,12 @@ docker-compose build --no-cache
 **Backend connection issues:**
 - Verify `appsettings.json` configuration
 - Check Azure OpenAI and CosmosDB credentials
-- Ensure ports 5000/5001 are available
+- Ensure ports 5000/5000 are available
 
 **Frontend not connecting to API:**
 - Check API URL in frontend configuration
 - Verify CORS settings in backend
 - Confirm services are running: `docker-compose ps`
-
-**Certificate issues (HTTPS):**
-```bash
-# Regenerate certificates
-dotnet dev-certs https --clean
-dotnet dev-certs https --trust
-```
 
 ---
 
@@ -494,7 +444,6 @@ dotnet dev-certs https --trust
 | `.env` | Root environment variables | Yes |
 | `appsettings.json` | .NET backend configuration | Yes |
 | `docker-compose.yml` | Container orchestration | No (for Docker) |
-| `.vscode/settings.json` | VS Code Live Server HTTPS | No (for HTTPS dev) |
 
 ---
 

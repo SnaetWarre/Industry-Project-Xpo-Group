@@ -2,7 +2,7 @@
 
 const BOT_NAME = 'AI-beursassistent';
 const WEBSITE = 'artisan';
-const API_URL = 'https://localhost:5001';
+const API_URL = 'http://localhost:5000';
 
 function injectChatbotHtml() {
   if (document.getElementById('chatbotLauncher')) return; // Already injected

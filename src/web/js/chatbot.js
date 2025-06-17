@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // API endpoint configuration
-  const API_URL = 'https://localhost:5001';
+  const API_URL = 'http://localhost:5000';
 
   // Helper to set and get sessionId cookie
   function setSessionIdCookie(sessionId) {

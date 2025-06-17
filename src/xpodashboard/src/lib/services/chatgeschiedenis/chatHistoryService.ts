@@ -11,7 +11,7 @@ export const getChatHistory = async (sessionId: string): Promise<ChatMessage[]> 
       throw new Error('No authentication token found');
     }
 
-    const response = await fetch(`https://localhost:5001/api/analytics-dashboard/chat-history/${sessionId}`, {
+    const response = await fetch(`http://localhost:5000/api/analytics-dashboard/chat-history/${sessionId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
