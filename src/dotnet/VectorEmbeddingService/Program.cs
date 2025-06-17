@@ -52,34 +52,15 @@ builder.Services.AddSwaggerGen(options =>
     options.EnableAnnotations();
 });
 
-// Add CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowSpecificOrigins", policy =>
-    {
-        policy.WithOrigins(
-            "https://www.abissummit.be",
-            "https://www.artisan-xpo.be",
-            "https://www.flandersflooringdays.com",
-            "http://localhost:5500",
-            "http://127.0.0.1:5500",
-            "https://localhost:5500",
-            "https://127.0.0.1:5500",
-            "http://localhost:3000"
-        )
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials();
-    });
-});
+
 
 // Configure CosmosDB
 builder.Services.AddSingleton<CosmosClient>(serviceProvider =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-    var connectionString = configuration["CosmosDb:ConnectionString"] ?? 
+    var connectionString = configuration["CosmosDb:ConnectionString"] ??
                           throw new ArgumentNullException("CosmosDb:ConnectionString");
-    
+
     var cosmosClientOptions = new CosmosClientOptions
     {
         ConnectionMode = ConnectionMode.Gateway,
@@ -88,7 +69,7 @@ builder.Services.AddSingleton<CosmosClient>(serviceProvider =>
             PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
         }
     };
-    
+
     return new CosmosClient(connectionString, cosmosClientOptions);
 });
 
@@ -128,8 +109,7 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
-// Add CORS before anything else that handles requests!
-app.UseCors("AllowSpecificOrigins");
+
 
 if (app.Environment.IsDevelopment())
 {
