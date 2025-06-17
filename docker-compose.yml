@@ -5,10 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: backend
     ports:
-      - "5001:5001"
+      - "5000:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-    
+
     volumes:
       - ./src/dotnet/VectorEmbeddingService:/app
 
@@ -22,22 +22,24 @@ services:
     env_file:
       - .env
     environment:
-      API_URL: https://backend:5001
+      API_URL: http://backend:5000
     entrypoint: ["sleep", "infinity"]
-    
+
     volumes:
       - ./src:/app/src
       - ./production:/app/production
       - ./data:/app/data
 
   xpodashboard:
-    image: node:20
+    image: node:20-alpine
     container_name: xpodashboard
     working_dir: /app
     depends_on:
       - backend
     ports:
       - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:5000
     volumes:
       - ./src/xpodashboard:/app
-    command: sh -c "npm install && npm run dev" 
+    command: sh -c "npm install && npm run dev"
