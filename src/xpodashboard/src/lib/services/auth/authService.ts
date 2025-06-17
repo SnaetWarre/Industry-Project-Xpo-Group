@@ -5,11 +5,6 @@ interface LoginResponse {
   token: string;
 }
 
-// Configure axios for development
-if (process.env.NODE_ENV === 'development') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
-
 class AuthService {
   private static token: string | null = null;
 

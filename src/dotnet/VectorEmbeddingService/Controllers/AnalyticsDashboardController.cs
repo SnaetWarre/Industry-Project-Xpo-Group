@@ -102,12 +102,12 @@ public class AnalyticsDashboardController : ControllerBase
             }
         }
         // Maak een dictionary voor snelle lookup: profileInfo (lowercase, trim) -> sessionId
-        var profileInfoToSessionId = userProfiles
+        var profileInfoToSessionIds = userProfiles
             .Where(u => !string.IsNullOrEmpty(u.ProfileInfo) && !string.IsNullOrEmpty(u.SessionId))
             .GroupBy(u => u.ProfileInfo.Trim().ToLower())
             .ToDictionary(
                 g => g.Key,
-                g => g.First().SessionId
+                g => g.Select(u => u.SessionId).ToList()
             );
 
         var result = new List<object>();
@@ -132,13 +132,14 @@ public class AnalyticsDashboardController : ControllerBase
                         }
                         if (chatToRegistrationSeconds == null)
                             chatToRegistrationSeconds = 0;
+                        var sessionIds = profileInfoToSessionIds.TryGetValue(profileInfo.Trim().ToLower(), out var sids) ? sids : new List<string>();
                         result.Add(new
                         {
                             profileInfo,
                             date,
                             count = clicked ? 1 : 0,
                             chatToRegistrationSeconds,
-                            sessionId = profileInfoToSessionId.TryGetValue(profileInfo.Trim().ToLower(), out var sid) ? sid : null
+                            sessionId = sessionIds.FirstOrDefault()
                         });
                     }
                 }
