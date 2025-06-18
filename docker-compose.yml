@@ -9,9 +9,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
 
-    volumes:
-      - ./src/dotnet/VectorEmbeddingService:/app
-
   pipeline:
     build:
       context: .
