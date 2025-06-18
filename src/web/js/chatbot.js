@@ -20,16 +20,19 @@ document.addEventListener("DOMContentLoaded", () => {
       botName: "AI-beursassistent",
       welcomeMessage:
         "Hoi! Ik ben je digitale beursassistent voor ABISS. Ik kan je helpen met informatie over digitalisering, automatisering, Industry of Things, Intelligence of Things en Security of Things. Waar ben je naar op zoek?",
+      headerColor: "#f44815", // Abiss header text color
     },
     ffd: {
       botName: "AI-beursassistent",
       welcomeMessage:
         "Hoi! Ik ben je beursassistent voor de vloeren- en isolatiebeurs. Ik kan je helpen met informatie over vloeren, isolatie en gerelateerde producten. Waar ben je naar op zoek?",
+      headerColor: "#d65a47", // FFD header text color
     },
     artisan: {
       botName: "AI-beursassistent",
       welcomeMessage:
         "Hoi! Ik ben je beursassistent voor artisanale en ambachtelijke producten. Ik kan je helpen met informatie over voedsel, dranken en andere ambachtelijke producten. Waar ben je naar op zoek?",
+      headerColor: "#4a4a4a", // Artisan header text color
     },
   };
 
@@ -62,6 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
         websiteId = newWebsiteId;
         chatbotContainer.dataset.website = websiteId;
         initializeWebsite();
+        updateRegisterBtnColor();
       } else {
         console.error(`Invalid website ID selected: ${chatSelector.value}`);
         chatSelector.value = websiteId; // Reset to previous valid value
@@ -131,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
     registrationStep = true;
     allMessages = [];
     lastRenderedScrollToBottom = true;
+    updateRegisterBtnColor();
   }
 
   // Pas form.onsubmit aan voor registratieflow
@@ -525,7 +530,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Add button styling for better appearance
   registerBtn.style.backgroundColor = "#ffffff";
-  registerBtn.style.color = "#d65a47";
   registerBtn.style.border = "2px solid #ffffff";
   registerBtn.style.borderRadius = "8px";
   registerBtn.style.padding = "8px 12px 12px 12px";
@@ -799,6 +803,16 @@ document.addEventListener("DOMContentLoaded", () => {
       return false;
     } catch (e) {
       return false;
+    }
+  }
+
+  function updateRegisterBtnColor() {
+    if (websiteId === "ffd") {
+      registerBtn.style.color = "#db6245";
+    } else if (websiteId === "abiss") {
+      registerBtn.style.color = "#e85811";
+    } else if (websiteId === "artisan") {
+      registerBtn.style.color = "#3f3f3f";
     }
   }
 });

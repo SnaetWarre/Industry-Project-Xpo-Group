@@ -568,13 +568,12 @@
 }
 
 .sticky-register-btn {
+  background: #fff;
   display: inline-block;
   position: static;
   margin-left: 16px;
   margin-bottom: 0;
   vertical-align: middle;
-  background: var(--ffd-color);
-  color: #fff;
   border: none;
   border-radius: 24px;
   padding: 6px 16px;
@@ -588,11 +587,14 @@
   height: 32px;
   line-height: 20px;
 }
+.chatbot-container[data-website='ffd'] .sticky-register-btn {
+  color: #db6245 !important;
+}
 .chatbot-container[data-website='abiss'] .sticky-register-btn {
-  background: var(--abiss-color);
+  color: #e85811 !important;
 }
 .chatbot-container[data-website='artisan'] .sticky-register-btn {
-  background: var(--artisan-color);
+  color: #3f3f3f !important;
 }
 .sticky-register-btn:hover {
   background: #b94c2e;
