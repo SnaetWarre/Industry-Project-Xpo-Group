@@ -23,7 +23,7 @@ class EventSiteSpider(scrapy.Spider):
         "FEED_FORMAT": "json",
         "FEED_EXPORT_ENCODING": "utf-8",
         "DEPTH_LIMIT": 0,
-        "LOG_LEVEL": "INFO",
+        "LOG_LEVEL": "WARNING",  # Only show WARNING and above (no INFO logs)
         "USER_AGENT": "KortrijkXpoBot/1.0 (+https://www.kortrijkxpo.com; bot@kortrijkxpo.com)",
         "ROBOTSTXT_OBEY": False,
     }
@@ -31,7 +31,16 @@ class EventSiteSpider(scrapy.Spider):
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super().from_crawler(crawler, *args, **kwargs)
+        crawler.signals.connect(spider.spider_opened, signal=signals.spider_opened)
+        crawler.signals.connect(spider.spider_closed, signal=signals.spider_closed)
         return spider
+
+    def spider_opened(self, spider):
+        self.logger.warning(f"Spider started: {self.name} for domain {self.allowed_domains[0] if self.allowed_domains else 'unknown'}")
+
+    def spider_closed(self, spider):
+        page_count = len(getattr(self, '_visited', set()))
+        self.logger.warning(f"Spider finished: {self.name} - Crawled {page_count} pages")
 
     def __init__(self, start_url: str | None = None, event_id: str = "event", depth: int = 0, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -55,12 +64,10 @@ class EventSiteSpider(scrapy.Spider):
     def parse(self, response: scrapy.http.Response):
         url = response.url
         if url.lower().endswith(".pdf"):
-            self.logger.info(f"Skipping PDF file: {url}")
             return
         if url in self._visited:
             return
         self._visited.add(url)
-        self.logger.info(f"Processing: {url}")
 
         # Extract basic page data
         title = response.css("title::text").get(default="").strip()
@@ -115,22 +122,22 @@ class EventSiteSpider(scrapy.Spider):
         for href in response.css("a[href]::attr(href)").getall():
             full_url = response.urljoin(href)
             parsed_url = urlparse(full_url)
-            
+
             # Skip PDF files
             if parsed_url.path.lower().endswith(".pdf"):
                 self.logger.debug(f"Skipping PDF link: {full_url}")
                 continue
-            
+
             # Ensure it's http/https, stays on the same domain, and not yet visited
             if (parsed_url.scheme in {"http", "https"} and
                 parsed_url.netloc == self.allowed_domains[0] and # Check against the spider's allowed domain
                 full_url not in self._visited):
                 potential_links_to_follow.append(full_url)
-        
+
         # Filter and prioritize these links based on language
         # Deduplicate potential_links_to_follow before filtering
         unique_potential_links = sorted(list(set(potential_links_to_follow)))
-        
+
         actually_follow_links = self._filter_and_prioritize_links(unique_potential_links)
 
         for link_to_visit in actually_follow_links:
@@ -147,13 +154,13 @@ class EventSiteSpider(scrapy.Spider):
         # More complex language code patterns might need a more robust regex
         lang_codes = ['en', 'nl', 'fr', 'de'] # Add more if needed
         path_segments = path.strip('/').split('/')
-        
+
         # Check if the first segment is a language code (e.g. /en/foo or /fr-BE/foo)
         if path_segments and path_segments[0].lower() in lang_codes:
             # Check if it's a simple lang code (e.g. 'en') or locale specific (e.g. 'en-gb')
             # For simplicity, we assume if it matches a base lang_code, it's a language marker.
             return '/' + '/'.join(path_segments[1:])
-        
+
         # Check for language codes like /nl-be/ or /fr_FR/ (heuristic)
         if path_segments and (re.match(r'^[a-z]{2}[-_][a-zA-Z]{2}$', path_segments[0]) or path_segments[0].lower() in lang_codes):
              # Check if the first part before - or _ is a known language code
@@ -171,17 +178,17 @@ class EventSiteSpider(scrapy.Spider):
         path_segments = path.strip('/').split('/')
         if not path_segments:
             return None
-        
+
         first_segment = path_segments[0].lower()
         # Simple 2-letter lang codes + common variants
         known_lang_prefixes = ['en', 'nl', 'fr', 'de'] # Could be expanded
         # Matches 'en', 'en-us', 'en_US', 'fr-be', etc.
-        lang_pattern = r'^([a-z]{2})([-_][a-zA-Z]{2})?$' 
-        
+        lang_pattern = r'^([a-z]{2})([-_][a-zA-Z]{2})?$'
+
         match = re.match(lang_pattern, first_segment)
         if match and match.group(1) in known_lang_prefixes:
             return first_segment # Return the full matched segment e.g. 'en' or 'en-us'
-        
+
         return None
 
 
@@ -190,7 +197,7 @@ class EventSiteSpider(scrapy.Spider):
             return []
 
         self.logger.debug(f"Filtering {len(links)} potential links: {links}")
-        
+
         grouped_by_base_path = {} # Key: base_path, Value: {'en': url, 'default': url, 'others': {lang: url}}
 
         for url_str in links:
@@ -200,9 +207,9 @@ class EventSiteSpider(scrapy.Spider):
 
             parsed_url = urlparse(url_str)
             path = parsed_url.path
-            
+
             lang_in_path = self._get_path_language(path)
-            
+
             # Use path without leading lang for grouping, but INCLUDE the query string
             # so that participant detail pages like /participant/?id=123 remain distinct.
             base_path_key = path # Default base_path (will update below)
@@ -222,7 +229,7 @@ class EventSiteSpider(scrapy.Spider):
 
             if base_path_key not in grouped_by_base_path:
                 grouped_by_base_path[base_path_key] = {'en': None, 'default': None, 'others': {}}
-            
+
             entry = grouped_by_base_path[base_path_key]
 
             if lang_in_path:
@@ -231,7 +238,7 @@ class EventSiteSpider(scrapy.Spider):
                 if primary_lang_key == 'en':
                     # Prefer shorter 'en' if multiple 'en-*' exist, or first one encountered
                     if not entry['en'] or (lang_in_path == 'en' and entry['en'] != url_str):
-                         entry['en'] = url_str 
+                         entry['en'] = url_str
                     elif not entry['en']: # first en-* variant
                         entry['en'] = url_str
                 else: # nl, fr, de etc.
@@ -240,7 +247,7 @@ class EventSiteSpider(scrapy.Spider):
             else: # No language code detected in path, assume default
                 if not entry['default']: # Store first default encountered
                     entry['default'] = url_str
-        
+
         final_links_to_follow = []
         for base_path, urls in grouped_by_base_path.items():
             chosen_url = None
@@ -252,7 +259,7 @@ class EventSiteSpider(scrapy.Spider):
                 self.logger.debug(f"Base path '{base_path}': No EN, chose DEFAULT version: {chosen_url}")
             else:
                 # No 'en' or 'default'. User wants to skip other languages.
-    
+
                 if urls['others']:
                     self.logger.debug(f"Base path '{base_path}': No EN or DEFAULT. Skipping other languages: {urls['others']}")
                 else:
@@ -262,10 +269,8 @@ class EventSiteSpider(scrapy.Spider):
                 final_links_to_follow.append(chosen_url)
             elif chosen_url and chosen_url in self._visited:
                  self.logger.debug(f"Base path '{base_path}': Chosen URL {chosen_url} was already visited, not adding again.")
-        
-        if len(links) != len(final_links_to_follow):
-            self.logger.info(f"Language filtering: reduced {len(links)} potential links to {len(final_links_to_follow)} selected links.")
-        else:
-            self.logger.debug(f"Language filtering: no change in link count ({len(links)}).")
-            
+
+        # No need to log link reduction details in production
+        pass
+
         return final_links_to_follow

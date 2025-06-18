@@ -4,12 +4,16 @@ from typing import List, Dict, Optional
 import logging
 import time
 import os
+import urllib3
+
+# Disable InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class VectorApiClient:
     def __init__(self, base_url: str = "http://localhost:5000", default_container: str = "ffd"):
         """
         Initialize the Vector API client.
-        
+
         Args:
             base_url: Base URL of the C# Vector Embedding Service
             default_container: Default container name
@@ -46,13 +50,13 @@ class VectorApiClient:
     def search_events(self, query: str, top_k: int = 5, threshold: float = 0.7, container: Optional[str] = None) -> List[Dict]:
         """
         Search for events using vector similarity.
-        
+
         Args:
             query: Search query text
             top_k: Number of top results to return
             threshold: Similarity threshold (0.0 to 1.0)
             container: Container name
-            
+
         Returns:
             List of event documents
         """
@@ -64,15 +68,14 @@ class VectorApiClient:
                 "topK": top_k,
                 "threshold": threshold
             }
-            
+
             self.logger.info(f"Searching events in container '{container}' with query: '{query}'")
             response = self.session.post(url, json=payload)
             response.raise_for_status()
-            
+
             events = response.json()
-            self.logger.info(f"Found {len(events)} events")
             return events
-            
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error searching events: {e}")
             return []
@@ -83,11 +86,11 @@ class VectorApiClient:
     def get_embedding(self, text: str, container: Optional[str] = None) -> Optional[List[float]]:
         """
         Get vector embedding for text.
-        
+
         Args:
             text: Text to embed
             container: Container name
-            
+
         Returns:
             Vector embedding as list of floats, or None if error
         """
@@ -95,13 +98,13 @@ class VectorApiClient:
         try:
             url = f"{self.base_url}/api/{container}/embedding"
             payload = {"text": text}
-            
+
             response = self.session.post(url, json=payload)
             response.raise_for_status()
-            
+
             embedding = response.json()
             return embedding
-            
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error getting embedding: {e}")
             return None
@@ -112,20 +115,20 @@ class VectorApiClient:
     def bulk_upload_events(self, events: List[Dict], container: Optional[str] = None) -> Dict:
         """
         Upload events in bulk to the vector database.
-        
+
         Args:
             events: List of event dictionaries from scraper
             container: Container name
-            
+
         Returns:
             Upload result summary
         """
         container = container or self.default_container
         try:
             url = f"{self.base_url}/api/{container}/bulk-upload"
-            
-            self.logger.info(f"Uploading {len(events)} events to vector database in container '{container}'")
-            
+
+            self.logger.warning(f"Upload started: {len(events)} events to '{container}'")
+
             # Transform events to match API's expected format
             transformed_events = []
             for event in events:
@@ -139,27 +142,28 @@ class VectorApiClient:
                     "source_type": event.get("source_type", "")
                 }
                 transformed_events.append(transformed_event)
-            
+
             # Upload events one at a time with retry logic
             successful_upserts = 0
             failed_upserts = 0
-            
+
             for event in transformed_events:
                 if self.upload_event_with_retry(event, url):
                     successful_upserts += 1
                 else:
                     failed_upserts += 1
-                    self.logger.error(f"Failed to upload event after retries: {event.get('title', 'Unknown')}")
-            
+                    # Keep error logs for actual failures
+                    self.logger.error(f"Failed to upload event: {event.get('title', 'Unknown')}")
+
             result = {
                 "totalEvents": len(events),
                 "successfulUpserts": successful_upserts,
                 "failedUpserts": failed_upserts
             }
-            
-            self.logger.info(f"Upload completed: {successful_upserts}/{len(events)} successful, {failed_upserts} failed")
+
+            self.logger.warning(f"Upload completed: {successful_upserts}/{len(events)} successful, {failed_upserts} failed")
             return result
-            
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error uploading events: {e}")
             return {"error": str(e)}
@@ -177,18 +181,14 @@ class VectorApiClient:
                     failed_upserts = result.get("failedUpserts", 0)
                     total_events = result.get("totalEvents", 0)
                     upserted_ids = result.get("upsertedIds", [])
-                    
-                    # Only log if there are failed upserts
-                    if failed_upserts > 0:
-                        self.logger.warning(f"Event '{event.get('title', 'Unknown')}': {successful_upserts} successful upserts, {failed_upserts} failed upserts out of {total_events} total events. Upserted IDs: {upserted_ids}")
-                    
+
+                    # Only log if there are failed upserts for important events
+                    if failed_upserts > 0 and successful_upserts == 0:
+                        self.logger.error(f"Upload failed for event: {event.get('title', 'Unknown')}")
+
                     # Consider it a success if we have any successful upserts OR if we have upserted IDs
                     if successful_upserts > 0 or len(upserted_ids) > 0:
                         return True
-                    
-                    # Only log warning if we actually got 0 successful upserts and some failed upserts
-                    if successful_upserts == 0 and failed_upserts > 0:
-                        self.logger.warning(f"Event upload returned 200 but no successful upserts: {result}")
                 elif response.status_code == 429:
                     retry_after = int(response.headers.get("Retry-After", backoff))
                     self.logger.debug(f"Rate limited, waiting {retry_after} seconds")
@@ -206,10 +206,10 @@ class VectorApiClient:
     def get_event_count(self, container: Optional[str] = None) -> int:
         """
         Get total number of events in the database.
-        
+
         Args:
             container: Container name
-            
+
         Returns:
             Number of events
         """
@@ -218,10 +218,10 @@ class VectorApiClient:
             url = f"{self.base_url}/api/{container}/count"
             response = self.session.get(url)
             response.raise_for_status()
-            
+
             result = response.json()
             return result.get("Count", 0)
-            
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error getting event count: {e}")
             return 0
@@ -232,10 +232,10 @@ class VectorApiClient:
     def get_all_events(self, container: Optional[str] = None) -> List[Dict]:
         """
         Get all events from the database.
-        
+
         Args:
             container: Container name
-            
+
         Returns:
             List of all event documents
         """
@@ -244,10 +244,10 @@ class VectorApiClient:
             url = f"{self.base_url}/api/{container}"
             response = self.session.get(url)
             response.raise_for_status()
-            
+
             events = response.json()
             return events
-            
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error getting all events: {e}")
             return []
@@ -258,10 +258,10 @@ class VectorApiClient:
     def health_check(self, container: Optional[str] = None) -> bool:
         """
         Check if the API service is available.
-        
+
         Args:
             container: Container name
-            
+
         Returns:
             True if service is available, False otherwise
         """
@@ -276,11 +276,11 @@ class VectorApiClient:
     def upload_scraped_data(self, json_file_path: str, container: Optional[str] = None) -> Dict:
         """
         Upload scraped data from JSON file to vector database.
-        
+
         Args:
             json_file_path: Path to JSON file with scraped events
             container: Container name
-            
+
         Returns:
             Upload result summary
         """
@@ -288,12 +288,12 @@ class VectorApiClient:
         try:
             with open(json_file_path, 'r', encoding='utf-8') as f:
                 events = json.load(f)
-            
+
             if not isinstance(events, list):
                 raise ValueError("JSON file must contain a list of events")
-            
+
             return self.bulk_upload_events(events, container=container)
-            
+
         except FileNotFoundError:
             error_msg = f"File not found: {json_file_path}"
             self.logger.error(error_msg)
@@ -316,4 +316,4 @@ class VectorApiClient:
             return response.status_code == 204
         except Exception as e:
             self.logger.error(f"Error deleting all events: {e}")
-            return False 
+            return False
