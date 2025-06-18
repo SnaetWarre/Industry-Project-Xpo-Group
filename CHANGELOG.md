@@ -1,6 +1,23 @@
 # Changelog
 
-All notable changes to Event Chatbot & Vector Embedding Service will be documented in this file.
+## [v1.1.0] - 2025-06-18
+
+### Added
+- Complete production-ready release with comprehensive documentation
+- Enhanced Docker deployment with optimized containerization
+- Improved error handling and logging throughout the application
+- Production environment configuration and deployment scripts
+- Enhanced security measures and authentication flows
+
+### Changed
+- Refined user interface and user experience across all components
+- Enhanced dashboard analytics and reporting capabilities
+- Streamlined deployment process with better configuration management
+- Improved chatbot header
+
+### Fixed
+- Resolved remaining stability issues in production environment
+- Improved error recovery and graceful degradation
 
 ## [v1.0.0] - 2025-06-15
 
