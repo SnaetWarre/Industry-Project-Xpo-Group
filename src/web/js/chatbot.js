@@ -70,8 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // API endpoint configuration
-  const API_URL =
-    "https://backend.delightfulforest-37e0645c.westeurope.azurecontainerapps.io";
+  const API_URL = "http://localhost:5000";
 
   // Helper to set and get sessionId cookie
   function setSessionIdCookie(sessionId) {
@@ -520,9 +519,87 @@ document.addEventListener("DOMContentLoaded", () => {
   let registerBtn = document.createElement("button");
   registerBtn.id = "stickyRegisterBtn";
   registerBtn.className = "sticky-register-btn";
-  registerBtn.textContent = "Expo registratiepagina openen";
-  registerBtn.setAttribute("aria-label", "Expo registratiepagina openen");
+  registerBtn.textContent = "Registreer hier je bezoek";
+  registerBtn.setAttribute("aria-label", "Registreren voor de expo");
   registerBtn.style.display = "none";
+
+  // Add button styling for better appearance
+  registerBtn.style.backgroundColor = "#ffffff";
+  registerBtn.style.color = "#d65a47";
+  registerBtn.style.border = "2px solid #ffffff";
+  registerBtn.style.borderRadius = "8px";
+  registerBtn.style.padding = "8px 12px 12px 12px";
+  registerBtn.style.fontSize = "13px";
+  registerBtn.style.fontWeight = "600";
+  registerBtn.style.lineHeight = "1";
+  registerBtn.style.cursor = "pointer";
+  registerBtn.style.boxShadow =
+    "0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1)";
+  registerBtn.style.transition = "all 0.2s ease-in-out";
+  registerBtn.style.marginLeft = "auto";
+  registerBtn.style.textAlign = "center";
+  registerBtn.style.display = "inline-flex";
+  registerBtn.style.alignItems = "center";
+  registerBtn.style.justifyContent = "center";
+  registerBtn.style.verticalAlign = "middle";
+  registerBtn.style.whiteSpace = "nowrap";
+  registerBtn.style.overflow = "hidden";
+  registerBtn.style.textOverflow = "ellipsis";
+  registerBtn.style.maxWidth = "200px";
+  registerBtn.style.minWidth = "100px";
+
+  // Function to update button responsiveness
+  function updateButtonResponsiveness() {
+    if (window.innerWidth < 768) {
+      registerBtn.textContent = "Registreren";
+      registerBtn.style.fontSize = "12px";
+      registerBtn.style.padding = "6px 10px 10px 10px";
+      registerBtn.style.maxWidth = "120px";
+    } else if (window.innerWidth < 1024) {
+      registerBtn.textContent = "Registreer hier";
+      registerBtn.style.fontSize = "13px";
+      registerBtn.style.padding = "8px 12px 12px 12px";
+      registerBtn.style.maxWidth = "150px";
+    } else {
+      registerBtn.textContent = "Registreer hier je bezoek";
+      registerBtn.style.fontSize = "13px";
+      registerBtn.style.padding = "8px 12px 12px 12px";
+      registerBtn.style.maxWidth = "200px";
+    }
+  }
+
+  // Initial responsive setup
+  updateButtonResponsiveness();
+
+  // Add resize listener for responsiveness
+  window.addEventListener("resize", updateButtonResponsiveness);
+
+  // Add hover effects
+  registerBtn.addEventListener("mouseenter", () => {
+    registerBtn.style.backgroundColor = "#f8f8f8";
+    registerBtn.style.boxShadow =
+      "0 6px 16px rgba(0, 0, 0, 0.2), 0 3px 8px rgba(0, 0, 0, 0.15)";
+    registerBtn.style.transform = "translateY(-2px)";
+  });
+
+  registerBtn.addEventListener("mouseleave", () => {
+    registerBtn.style.backgroundColor = "#ffffff";
+    registerBtn.style.boxShadow =
+      "0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1)";
+    registerBtn.style.transform = "translateY(0)";
+  });
+
+  registerBtn.addEventListener("mousedown", () => {
+    registerBtn.style.transform = "translateY(0)";
+    registerBtn.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
+  });
+
+  registerBtn.addEventListener("mouseup", () => {
+    registerBtn.style.transform = "translateY(-2px)";
+    registerBtn.style.boxShadow =
+      "0 6px 16px rgba(0, 0, 0, 0.2), 0 3px 8px rgba(0, 0, 0, 0.15)";
+  });
+
   // Insert the button immediately after the headerTitle (FLORBot text)
   headerTitle.insertAdjacentElement("afterend", registerBtn);
 
