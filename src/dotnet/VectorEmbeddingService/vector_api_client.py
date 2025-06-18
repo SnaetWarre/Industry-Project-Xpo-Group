@@ -32,7 +32,7 @@ class VectorApiClient:
             raise RuntimeError("UPLOAD_SERVICE_USERNAME and UPLOAD_SERVICE_PASSWORD must be set as environment variables.")
         login_url = f"{self.base_url}/api/auth/login"
         try:
-            resp = self.session.post(login_url, json={"username": username, "password": password}, verify=False)
+            resp = self.session.post(login_url, json={"username": username, "password": password})
             resp.raise_for_status()
             token = resp.json().get("token")
             if not token:
@@ -66,7 +66,7 @@ class VectorApiClient:
             }
             
             self.logger.info(f"Searching events in container '{container}' with query: '{query}'")
-            response = self.session.post(url, json=payload, verify=False)
+            response = self.session.post(url, json=payload)
             response.raise_for_status()
             
             events = response.json()
@@ -96,7 +96,7 @@ class VectorApiClient:
             url = f"{self.base_url}/api/{container}/embedding"
             payload = {"text": text}
             
-            response = self.session.post(url, json=payload, verify=False)
+            response = self.session.post(url, json=payload)
             response.raise_for_status()
             
             embedding = response.json()
@@ -170,7 +170,7 @@ class VectorApiClient:
     def upload_event_with_retry(self, event, url, max_retries=3, backoff=2):
         for attempt in range(max_retries):
             try:
-                response = self.session.post(url, json={"events": [event]}, verify=False)
+                response = self.session.post(url, json={"events": [event]})
                 if response.status_code == 200:
                     result = response.json()
                     successful_upserts = result.get("successfulUpserts", 0)
@@ -216,7 +216,7 @@ class VectorApiClient:
         container = container or self.default_container
         try:
             url = f"{self.base_url}/api/{container}/count"
-            response = self.session.get(url, verify=False)
+            response = self.session.get(url)
             response.raise_for_status()
             
             result = response.json()
@@ -242,7 +242,7 @@ class VectorApiClient:
         container = container or self.default_container
         try:
             url = f"{self.base_url}/api/{container}"
-            response = self.session.get(url, verify=False)
+            response = self.session.get(url)
             response.raise_for_status()
             
             events = response.json()
@@ -268,7 +268,7 @@ class VectorApiClient:
         container = container or self.default_container
         try:
             url = f"{self.base_url}/api/{container}/count"
-            response = self.session.get(url, timeout=5, verify=False)
+            response = self.session.get(url, timeout=5)
             return response.status_code == 200
         except:
             return False
@@ -311,7 +311,7 @@ class VectorApiClient:
         container = container or self.default_container
         try:
             url = f"{self.base_url}/api/{container}"
-            response = self.session.delete(url, verify=False)
+            response = self.session.delete(url)
             response.raise_for_status()
             return response.status_code == 204
         except Exception as e:
