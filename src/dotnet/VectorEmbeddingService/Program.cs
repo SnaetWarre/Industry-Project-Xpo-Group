@@ -16,6 +16,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Add CORS only in development
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowFrontend", policy =>
+        {
+            policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:3000")
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        });
+    });
+}
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "VectorEmbeddingService", Version = "v1" });
@@ -119,6 +135,12 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
         options.SwaggerEndpoint("/swagger/dashboard/swagger.json", "Dashboard");
     });
+}
+
+// Use CORS only in development - must be before Authentication/Authorization
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("AllowFrontend");
 }
 
 app.UseAuthentication(); // Only needed for [Authorize] controllers
